@@ -1,0 +1,932 @@
+IP: 192.168.1.11
+Modelo: ./experiments/q_table_pc_1.pth
+Exploração: 0.0%
+============================================================
+🧠 Configurando Agente para Modelo 2D (3 Inputs)
+✅ Carregando pesos de: ./experiments/q_table_pc_1.pth
+Carregando MiDaS Small (Rápido para CPU)...
+Using cache found in C:\Users\HP/.cache\torch\hub\intel-isl_MiDaS_master
+C:\Users\HP\AppData\Local\Programs\Python\Python310\lib\site-packages\timm\models\layers\__init__.py:48: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+Loading weights:  None
+Using cache found in C:\Users\HP/.cache\torch\hub\rwightman_gen-efficientnet-pytorch_master
+Using cache found in C:\Users\HP/.cache\torch\hub\intel-isl_MiDaS_master
+
+📷 Step 1/200
+[TIME] function get_frame -> elapsed 346.73476219177246ms
+[TIME] function _create_debug_2d -> elapsed 13.910531997680664ms
+[TIME] function process_frame -> elapsed 167.3884391784668ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 138.53812217712402ms
+🎬 Ação: FWD
+📊 State: (0.5, 0.475, 0.43125) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 119.13275718688965ms
+Foi necessário parar programaticamente após 1.2713332176208496s
+
+📷 Step 2/200
+[TIME] function get_frame -> elapsed 118.35050582885742ms
+[TIME] function _create_debug_2d -> elapsed 14.244318008422852ms
+[TIME] function process_frame -> elapsed 129.72235679626465ms
+[TIME] function get_action -> elapsed 1.001596450805664ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 123.2452392578125ms
+🎬 Ação: FWD
+📊 State: (0.59375, 0.575, 0.525) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 238.94691467285156ms
+Foi necessário parar programaticamente após 1.3706066608428955s
+
+📷 Step 3/200
+[TIME] function get_frame -> elapsed 57.56855010986328ms
+[TIME] function _create_debug_2d -> elapsed 11.006355285644531ms
+[TIME] function process_frame -> elapsed 124.26567077636719ms
+[TIME] function get_action -> elapsed 1.0020732879638672ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 69.23174858093262ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.0, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 164.97063636779785ms
+Foi necessário parar programaticamente após 1.248591423034668s
+
+📷 Step 4/200
+[TIME] function get_frame -> elapsed 77.78072357177734ms
+[TIME] function _create_debug_2d -> elapsed 12.685060501098633ms
+[TIME] function process_frame -> elapsed 121.93632125854492ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 172.98030853271484ms
+🎬 Ação: FWD
+📊 State: (0.575, 0.5375, 0.475) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 432.6601028442383ms
+Foi necessário parar programaticamente após 1.6089832782745361s
+
+📷 Step 5/200
+[TIME] function get_frame -> elapsed 71.32840156555176ms
+[TIME] function _create_debug_2d -> elapsed 10.157585144042969ms
+[TIME] function process_frame -> elapsed 107.20372200012207ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 87.53681182861328ms
+🎬 Ação: RGHT
+📊 State: (0.35, 0.59375, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 247.35069274902344ms
+Foi necessário parar programaticamente após 1.3515000343322754s
+
+📷 Step 6/200
+[TIME] function get_frame -> elapsed 57.94548988342285ms
+[TIME] function _create_debug_2d -> elapsed 12.450456619262695ms
+[TIME] function process_frame -> elapsed 115.50259590148926ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 105.15475273132324ms
+🎬 Ação: RGHT
+📊 State: (0.40625, 0.4, 0.31875) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 157.74202346801758ms
+Foi necessário parar programaticamente após 1.2676725387573242s
+
+📷 Step 7/200
+[TIME] function get_frame -> elapsed 112.2894287109375ms
+[TIME] function _create_debug_2d -> elapsed 15.457391738891602ms
+[TIME] function process_frame -> elapsed 123.42572212219238ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 120.50390243530273ms
+🎬 Ação: FWD
+📊 State: (0.5375, 0.56875, 0.59375) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 98.69861602783203ms
+Foi necessário parar programaticamente após 1.2370843887329102s
+
+📷 Step 8/200
+[TIME] function get_frame -> elapsed 211.7784023284912ms
+[TIME] function _create_debug_2d -> elapsed 15.167951583862305ms
+[TIME] function process_frame -> elapsed 123.48413467407227ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 98.58942031860352ms
+🎬 Ação: FWD
+📊 State: (1.0, 1.0, 1.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 69.79608535766602ms
+Foi necessário parar programaticamente após 1.179457426071167s
+
+📷 Step 9/200
+[TIME] function get_frame -> elapsed 74.17464256286621ms
+[TIME] function _create_debug_2d -> elapsed 15.997171401977539ms
+[TIME] function process_frame -> elapsed 126.56593322753906ms
+[TIME] function get_action -> elapsed 1.1794567108154297ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 94.97976303100586ms
+🎬 Ação: BWD
+📊 State: (0.15000000000000002, 0.30000000000000004, 0.14375000000000004) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 222.08309173583984ms
+Foi necessário parar programaticamente após 1.3302686214447021s
+
+📷 Step 10/200
+[TIME] function get_frame -> elapsed 98.78373146057129ms
+[TIME] function _create_debug_2d -> elapsed 16.25680923461914ms
+[TIME] function process_frame -> elapsed 122.80917167663574ms
+[TIME] function get_action -> elapsed 1.0001659393310547ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 179.47030067443848ms
+🎬 Ação: FWD
+📊 State: (0.6375, 0.60625, 0.4) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 144.56677436828613ms
+Foi necessário parar programaticamente após 1.335371971130371s
+
+📷 Step 11/200
+[TIME] function get_frame -> elapsed 54.703474044799805ms
+[TIME] function _create_debug_2d -> elapsed 11.505603790283203ms
+[TIME] function process_frame -> elapsed 139.0995979309082ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 67.63052940368652ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.30625, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 72.66974449157715ms
+Foi necessário parar programaticamente após 1.1501331329345703s
+
+📷 Step 12/200
+[TIME] function get_frame -> elapsed 64.0251636505127ms
+[TIME] function _create_debug_2d -> elapsed 14.032840728759766ms
+[TIME] function process_frame -> elapsed 128.37457656860352ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 107.36393928527832ms
+🎬 Ação: FWD
+📊 State: (1.0, 0.65, 0.5) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 134.94539260864258ms
+Foi necessário parar programaticamente após 1.2599966526031494s
+
+📷 Step 13/200
+[TIME] function get_frame -> elapsed 52.387237548828125ms
+[TIME] function _create_debug_2d -> elapsed 11.266946792602539ms
+[TIME] function process_frame -> elapsed 120.13030052185059ms
+[TIME] function get_action -> elapsed 1.0025501251220703ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 238.69919776916504ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.03125, 0.15000000000000002) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 66.63179397583008ms
+Foi necessário parar programaticamente após 1.3197197914123535s
+
+📷 Step 14/200
+[TIME] function get_frame -> elapsed 56.485652923583984ms
+[TIME] function _create_debug_2d -> elapsed 13.000011444091797ms
+[TIME] function process_frame -> elapsed 122.47323989868164ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 69.37146186828613ms
+🎬 Ação: FWD
+📊 State: (0.43125, 0.5, 0.39375000000000004) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 98.24132919311523ms
+Foi necessário parar programaticamente após 1.1731069087982178s
+
+📷 Step 15/200
+[TIME] function get_frame -> elapsed 53.44438552856445ms
+[TIME] function _create_debug_2d -> elapsed 12.29095458984375ms
+[TIME] function process_frame -> elapsed 119.5061206817627ms
+[TIME] function get_action -> elapsed 0.9996891021728516ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 103.10983657836914ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.09999999999999998, 0.1875) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 2374.659776687622ms
+Foi necessário parar programaticamente após 3.485583543777466s
+
+📷 Step 16/200
+[TIME] function get_frame -> elapsed 92.57674217224121ms
+[TIME] function _create_debug_2d -> elapsed 12.722253799438477ms
+[TIME] function process_frame -> elapsed 119.39835548400879ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 77.44240760803223ms
+🎬 Ação: RGHT
+📊 State: (0.475, 0.29374999999999996, 0.09375) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 150.05087852478027ms
+Foi necessário parar programaticamente após 1.2410778999328613s
+
+📷 Step 17/200
+[TIME] function get_frame -> elapsed 67.7025318145752ms
+[TIME] function _create_debug_2d -> elapsed 12.99285888671875ms
+[TIME] function process_frame -> elapsed 119.69685554504395ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 199.60260391235352ms
+🎬 Ação: FWD
+📊 State: (0.46875, 0.45625000000000004, 0.48124999999999996) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 66.97320938110352ms
+Foi necessário parar programaticamente após 1.2804949283599854s
+
+📷 Step 18/200
+[TIME] function get_frame -> elapsed 69.21076774597168ms
+[TIME] function _create_debug_2d -> elapsed 12.603998184204102ms
+[TIME] function process_frame -> elapsed 124.44400787353516ms
+[TIME] function get_action -> elapsed 1.0018348693847656ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 234.15255546569824ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.0, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 88.72842788696289ms
+Foi necessário parar programaticamente após 1.3399684429168701s
+
+📷 Step 19/200
+[TIME] function get_frame -> elapsed 78.58753204345703ms
+[TIME] function _create_debug_2d -> elapsed 12.213945388793945ms
+[TIME] function process_frame -> elapsed 116.07861518859863ms
+[TIME] function get_action -> elapsed 1.0042190551757812ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 209.14793014526367ms
+🎬 Ação: FWD
+📊 State: (0.59375, 0.59375, 0.59375) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 69.75674629211426ms
+Foi necessário parar programaticamente após 1.2935717105865479s
+
+📷 Step 20/200
+[TIME] function get_frame -> elapsed 73.27795028686523ms
+[TIME] function _create_debug_2d -> elapsed 11.00611686706543ms
+[TIME] function process_frame -> elapsed 111.30475997924805ms
+[TIME] function get_action -> elapsed 1.3532638549804688ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 300.3523349761963ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.0, 0.0625) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 84.7773551940918ms
+Foi necessário parar programaticamente após 1.40214204788208s
+
+📷 Step 21/200
+[TIME] function get_frame -> elapsed 42.45734214782715ms
+[TIME] function _create_debug_2d -> elapsed 11.723756790161133ms
+[TIME] function process_frame -> elapsed 131.7284107208252ms
+[TIME] function get_action -> elapsed 0.9970664978027344ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 99.81584548950195ms
+🎬 Ação: FWD
+📊 State: (0.5, 0.575, 0.59375) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 117.7666187286377ms
+Foi necessário parar programaticamente após 1.2284879684448242s
+
+📷 Step 22/200
+[TIME] function get_frame -> elapsed 38.10620307922363ms
+[TIME] function _create_debug_2d -> elapsed 12.395381927490234ms
+[TIME] function process_frame -> elapsed 123.53157997131348ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 94.50888633728027ms
+🎬 Ação: FWD
+📊 State: (0.33125000000000004, 0.4625, 0.675) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 127.99620628356934ms
+Foi necessário parar programaticamente após 1.2378771305084229s
+
+📷 Step 23/200
+[TIME] function get_frame -> elapsed 414.16144371032715ms
+[TIME] function _create_debug_2d -> elapsed 13.323307037353516ms
+[TIME] function process_frame -> elapsed 134.0625286102295ms
+[TIME] function get_action -> elapsed 0.5049705505371094ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 83.25004577636719ms
+🎬 Ação: BWD
+📊 State: (0.15000000000000002, 0.15625, 0.03749999999999998) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 126.26290321350098ms
+Foi necessário parar programaticamente após 1.2152042388916016s
+
+📷 Step 24/200
+[TIME] function get_frame -> elapsed 118.63017082214355ms
+[TIME] function _create_debug_2d -> elapsed 11.633872985839844ms
+[TIME] function process_frame -> elapsed 132.9662799835205ms
+[TIME] function get_action -> elapsed 1.0776519775390625ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 231.97531700134277ms
+🎬 Ação: FWD
+📊 State: (0.43125, 0.5125, 0.6) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 218.34540367126465ms
+Foi necessário parar programaticamente após 1.464733600616455s
+
+📷 Step 25/200
+[TIME] function get_frame -> elapsed 54.85963821411133ms
+[TIME] function _create_debug_2d -> elapsed 12.039661407470703ms
+[TIME] function process_frame -> elapsed 127.23922729492188ms
+[TIME] function get_action -> elapsed 1.0008811950683594ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 68.40300559997559ms
+🎬 Ação: BWD
+📊 State: (0.25, 0.19374999999999998, 0.13749999999999996) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 169.94357109069824ms
+Foi necessário parar programaticamente após 1.2430007457733154s
+
+📷 Step 26/200
+[TIME] function get_frame -> elapsed 142.92573928833008ms
+[TIME] function _create_debug_2d -> elapsed 12.206315994262695ms
+[TIME] function process_frame -> elapsed 121.7494010925293ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 130.5372714996338ms
+🎬 Ação: FWD
+📊 State: (0.4375, 0.53125, 0.59375) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 219.41804885864258ms
+Foi necessário parar programaticamente após 1.3619098663330078s
+
+📷 Step 27/200
+[TIME] function get_frame -> elapsed 140.49887657165527ms
+[TIME] function _create_debug_2d -> elapsed 12.48621940612793ms
+[TIME] function process_frame -> elapsed 122.44367599487305ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 237.41912841796875ms
+🎬 Ação: BWD
+📊 State: (0.15625, 0.13124999999999998, 0.06874999999999998) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 115.22269248962402ms
+Foi necessário parar programaticamente após 1.362929105758667s
+
+📷 Step 28/200
+[TIME] function get_frame -> elapsed 122.2994327545166ms
+[TIME] function _create_debug_2d -> elapsed 12.230396270751953ms
+[TIME] function process_frame -> elapsed 122.2691535949707ms
+[TIME] function get_action -> elapsed 1.4808177947998047ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 110.4271411895752ms
+🎬 Ação: FWD
+📊 State: (0.59375, 0.59375, 0.56875) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 89.78652954101562ms
+Foi necessário parar programaticamente após 1.212864875793457s
+
+📷 Step 29/200
+[TIME] function get_frame -> elapsed 70.36852836608887ms
+[TIME] function _create_debug_2d -> elapsed 12.998819351196289ms
+[TIME] function process_frame -> elapsed 116.00589752197266ms
+[TIME] function get_action -> elapsed 1.0006427764892578ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 75.26993751525879ms
+🎬 Ação: RGHT
+📊 State: (0.08750000000000002, 0.38749999999999996, 0.41874999999999996) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 404.1416645050049ms
+Foi necessário parar programaticamente após 1.4826972484588623s
+
+📷 Step 30/200
+[TIME] function get_frame -> elapsed 77.11625099182129ms
+[TIME] function _create_debug_2d -> elapsed 13.001203536987305ms
+[TIME] function process_frame -> elapsed 121.13428115844727ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 234.02929306030273ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.0, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 125.01215934753418ms
+Foi necessário parar programaticamente após 1.3633825778961182s
+
+📷 Step 31/200
+[TIME] function get_frame -> elapsed 152.63032913208008ms
+[TIME] function _create_debug_2d -> elapsed 13.519525527954102ms
+[TIME] function process_frame -> elapsed 128.27038764953613ms
+[TIME] function get_action -> elapsed 0.9989738464355469ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 223.54793548583984ms
+🎬 Ação: FWD
+📊 State: (0.5625, 0.5875, 0.625) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 254.76479530334473ms
+Foi necessário parar programaticamente após 1.487128496170044s
+
+📷 Step 32/200
+[TIME] function get_frame -> elapsed 215.6379222869873ms
+[TIME] function _create_debug_2d -> elapsed 14.339208602905273ms
+[TIME] function process_frame -> elapsed 116.12915992736816ms
+[TIME] function get_action -> elapsed 1.0020732879638672ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 128.54552268981934ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.025000000000000022, 0.13749999999999996) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 142.78340339660645ms
+Foi necessário parar programaticamente após 1.2812135219573975s
+
+📷 Step 33/200
+[TIME] function get_frame -> elapsed 101.09257698059082ms
+[TIME] function _create_debug_2d -> elapsed 12.06064224243164ms
+[TIME] function process_frame -> elapsed 117.7527904510498ms
+[TIME] function get_action -> elapsed 1.0061264038085938ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 135.6980800628662ms
+🎬 Ação: FWD
+📊 State: (0.45625000000000004, 0.49375, 0.525) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 157.81092643737793ms
+Foi necessário parar programaticamente após 1.3102431297302246s
+
+📷 Step 34/200
+[TIME] function get_frame -> elapsed 60.77218055725098ms
+[TIME] function _create_debug_2d -> elapsed 11.687517166137695ms
+[TIME] function process_frame -> elapsed 119.9038028717041ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 193.19820404052734ms
+🎬 Ação: BWD
+📊 State: (0.4, 0.20625000000000004, 0.08750000000000002) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 105.03649711608887ms
+Foi necessário parar programaticamente após 1.3081307411193848s
+
+📷 Step 35/200
+[TIME] function get_frame -> elapsed 98.2656478881836ms
+[TIME] function _create_debug_2d -> elapsed 15.512943267822266ms
+[TIME] function process_frame -> elapsed 163.74468803405762ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 165.85922241210938ms
+🎬 Ação: FWD
+📊 State: (0.48750000000000004, 0.575, 0.5625) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 79.27966117858887ms
+Foi necessário parar programaticamente após 1.2701292037963867s
+
+📷 Step 36/200
+[TIME] function get_frame -> elapsed 60.39309501647949ms
+[TIME] function _create_debug_2d -> elapsed 13.998985290527344ms
+[TIME] function process_frame -> elapsed 147.67789840698242ms
+[TIME] function get_action -> elapsed 1.0142326354980469ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 164.83044624328613ms
+🎬 Ação: BWD
+📊 State: (0.34375, 0.23124999999999996, 0.10624999999999996) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 224.50876235961914ms
+Foi necessário parar programaticamente após 1.3969495296478271s
+
+📷 Step 37/200
+[TIME] function get_frame -> elapsed 55.82022666931152ms
+[TIME] function _create_debug_2d -> elapsed 11.000633239746094ms
+[TIME] function process_frame -> elapsed 114.77994918823242ms
+[TIME] function get_action -> elapsed 1.0037422180175781ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 76.18832588195801ms
+🎬 Ação: FWD
+📊 State: (0.49375, 0.525, 0.5625) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 260.94651222229004ms
+Foi necessário parar programaticamente após 1.354828119277954s
+
+📷 Step 38/200
+[TIME] function get_frame -> elapsed 52.925825119018555ms
+[TIME] function _create_debug_2d -> elapsed 11.00468635559082ms
+[TIME] function process_frame -> elapsed 120.11146545410156ms
+[TIME] function get_action -> elapsed 1.0006427764892578ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 135.18857955932617ms
+🎬 Ação: BWD
+📊 State: (0.08125000000000004, 0.08750000000000002, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 192.65079498291016ms
+Foi necessário parar programaticamente após 1.3356211185455322s
+
+📷 Step 39/200
+[TIME] function get_frame -> elapsed 109.77435111999512ms
+[TIME] function _create_debug_2d -> elapsed 12.012958526611328ms
+[TIME] function process_frame -> elapsed 119.31037902832031ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 71.12646102905273ms
+🎬 Ação: FWD
+📊 State: (0.48750000000000004, 0.5375, 0.55) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 251.10793113708496ms
+Foi necessário parar programaticamente após 1.3309447765350342s
+
+📷 Step 40/200
+[TIME] function get_frame -> elapsed 142.17877388000488ms
+[TIME] function _create_debug_2d -> elapsed 12.006044387817383ms
+[TIME] function process_frame -> elapsed 122.81036376953125ms
+[TIME] function get_action -> elapsed 1.0027885437011719ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 76.93266868591309ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.07499999999999996, 0.28125) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 70.74642181396484ms
+Foi necessário parar programaticamente após 1.1546719074249268s
+
+📷 Step 41/200
+[TIME] function get_frame -> elapsed 41.39542579650879ms
+[TIME] function _create_debug_2d -> elapsed 12.594223022460938ms
+[TIME] function process_frame -> elapsed 147.19486236572266ms
+[TIME] function get_action -> elapsed 0.6620883941650391ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 116.7147159576416ms
+🎬 Ação: FWD
+📊 State: (0.63125, 0.66875, 0.66875) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 230.93938827514648ms
+Foi necessário parar programaticamente após 1.357590675354004s
+
+📷 Step 42/200
+[TIME] function get_frame -> elapsed 33.416748046875ms
+[TIME] function _create_debug_2d -> elapsed 11.513233184814453ms
+[TIME] function process_frame -> elapsed 121.93942070007324ms
+[TIME] function get_action -> elapsed 1.001119613647461ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 143.6600685119629ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.0, 0.40625) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 2605.803966522217ms
+Foi necessário parar programaticamente após 3.767477035522461s
+
+📷 Step 43/200
+[TIME] function get_frame -> elapsed 122.17044830322266ms
+[TIME] function _create_debug_2d -> elapsed 12.521028518676758ms
+[TIME] function process_frame -> elapsed 131.71100616455078ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 69.95272636413574ms
+🎬 Ação: RGHT
+📊 State: (0.44999999999999996, 0.2875, 0.30625) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 211.31634712219238ms
+Foi necessário parar programaticamente após 1.291048526763916s
+
+📷 Step 44/200
+[TIME] function get_frame -> elapsed 84.36226844787598ms
+[TIME] function _create_debug_2d -> elapsed 11.255741119384766ms
+[TIME] function process_frame -> elapsed 121.48785591125488ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 111.6628646850586ms
+🎬 Ação: FWD
+📊 State: (0.53125, 0.55, 0.55625) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 113.25645446777344ms
+Foi necessário parar programaticamente após 1.2334561347961426s
+
+📷 Step 45/200
+[TIME] function get_frame -> elapsed 1177.9627799987793ms
+[TIME] function _create_debug_2d -> elapsed 11.008024215698242ms
+[TIME] function process_frame -> elapsed 117.88797378540039ms
+[TIME] function get_action -> elapsed 1.0073184967041016ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 152.6505947113037ms
+🎬 Ação: RGHT
+📊 State: (0.48124999999999996, 0.32499999999999996, 0.06874999999999998) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 225.40807723999023ms
+Foi necessário parar programaticamente após 1.3952674865722656s
+
+📷 Step 46/200
+[TIME] function get_frame -> elapsed 49.89480972290039ms
+[TIME] function _create_debug_2d -> elapsed 11.001348495483398ms
+[TIME] function process_frame -> elapsed 113.09814453125ms
+[TIME] function get_action -> elapsed 1.0018348693847656ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 165.2204990386963ms
+🎬 Ação: BWD
+📊 State: (0.38125, 0.2875, 0.03125) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 97.53060340881348ms
+Foi necessário parar programaticamente após 1.269765853881836s
+
+📷 Step 47/200
+[TIME] function get_frame -> elapsed 216.49765968322754ms
+[TIME] function _create_debug_2d -> elapsed 12.003660202026367ms
+[TIME] function process_frame -> elapsed 116.80269241333008ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 130.19394874572754ms
+🎬 Ação: FWD
+📊 State: (0.61875, 0.6625, 1.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 170.7170009613037ms
+Foi necessário parar programaticamente após 1.3103108406066895s
+
+📷 Step 48/200
+[TIME] function get_frame -> elapsed 72.57080078125ms
+[TIME] function _create_debug_2d -> elapsed 12.229204177856445ms
+[TIME] function process_frame -> elapsed 116.2419319152832ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 107.93399810791016ms
+🎬 Ação: RGHT
+📊 State: (0.43125, 0.275, 0.09375) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 259.843111038208ms
+Foi necessário parar programaticamente após 1.3824973106384277s
+
+📷 Step 49/200
+[TIME] function get_frame -> elapsed 43.27988624572754ms
+[TIME] function _create_debug_2d -> elapsed 11.517047882080078ms
+[TIME] function process_frame -> elapsed 133.3334445953369ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 160.92896461486816ms
+🎬 Ação: FWD
+📊 State: (0.4125, 0.44999999999999996, 0.43125) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 184.59391593933105ms
+Foi necessário parar programaticamente após 1.354323148727417s
+
+📷 Step 50/200
+[TIME] function get_frame -> elapsed 51.61786079406738ms
+[TIME] function _create_debug_2d -> elapsed 12.283563613891602ms
+[TIME] function process_frame -> elapsed 128.76582145690918ms
+[TIME] function get_action -> elapsed 0.7357597351074219ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 156.358003616333ms
+🎬 Ação: RGHT
+📊 State: (0.43125, 0.42500000000000004, 0.33125000000000004) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 85.28971672058105ms
+Foi necessário parar programaticamente após 1.2518329620361328s
+
+📷 Step 51/200
+[TIME] function get_frame -> elapsed 133.27312469482422ms
+[TIME] function _create_debug_2d -> elapsed 11.921167373657227ms
+[TIME] function process_frame -> elapsed 116.52302742004395ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 129.8353672027588ms
+🎬 Ação: FWD
+📊 State: (0.4625, 0.45625000000000004, 0.38749999999999996) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 118.02530288696289ms
+Foi necessário parar programaticamente após 1.2605583667755127s
+
+📷 Step 52/200
+[TIME] function get_frame -> elapsed 128.94248962402344ms
+[TIME] function _create_debug_2d -> elapsed 10.509967803955078ms
+[TIME] function process_frame -> elapsed 122.82586097717285ms
+[TIME] function get_action -> elapsed 0.9999275207519531ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 387.94517517089844ms
+🎬 Ação: RGHT
+📊 State: (0.41874999999999996, 0.4625, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 65.66977500915527ms
+Foi necessário parar programaticamente após 1.4705619812011719s
+
+📷 Step 53/200
+[TIME] function get_frame -> elapsed 68.62449645996094ms
+[TIME] function _create_debug_2d -> elapsed 25.80571174621582ms
+[TIME] function process_frame -> elapsed 136.43622398376465ms
+[TIME] function get_action -> elapsed 1.001119613647461ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 142.8966522216797ms
+🎬 Ação: FWD
+📊 State: (0.64375, 1.0, 1.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 170.98379135131836ms
+Foi necessário parar programaticamente após 1.3256556987762451s
+
+📷 Step 54/200
+[TIME] function get_frame -> elapsed 35.917043685913086ms
+[TIME] function _create_debug_2d -> elapsed 11.945009231567383ms
+[TIME] function process_frame -> elapsed 122.99633026123047ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 131.07991218566895ms
+🎬 Ação: BWD
+📊 State: (0.4, 0.25, 0.11250000000000004) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 221.29249572753906ms
+Foi necessário parar programaticamente após 1.3635923862457275s
+
+📷 Step 55/200
+[TIME] function get_frame -> elapsed 53.35736274719238ms
+[TIME] function _create_debug_2d -> elapsed 10.99538803100586ms
+[TIME] function process_frame -> elapsed 162.5990867614746ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 67.81506538391113ms
+🎬 Ação: FWD
+📊 State: (0.59375, 0.50625, 0.475) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 230.86047172546387ms
+Foi necessário parar programaticamente após 1.3049805164337158s
+
+📷 Step 56/200
+[TIME] function get_frame -> elapsed 2287.0421409606934ms
+[TIME] function _create_debug_2d -> elapsed 11.999368667602539ms
+[TIME] function process_frame -> elapsed 117.65384674072266ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 471.1470603942871ms
+🎬 Ação: BWD
+📊 State: (0.0, 0.07499999999999996, 0.1875) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 141.19672775268555ms
+Foi necessário parar programaticamente após 1.6263861656188965s
+
+📷 Step 57/200
+[TIME] function get_frame -> elapsed 65.04988670349121ms
+[TIME] function _create_debug_2d -> elapsed 12.895822525024414ms
+[TIME] function process_frame -> elapsed 134.74655151367188ms
+[TIME] function get_action -> elapsed 1.0066032409667969ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 241.0130500793457ms
+🎬 Ação: FWD
+📊 State: (0.51875, 0.49375, 0.44999999999999996) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 218.05500984191895ms
+Foi necessário parar programaticamente após 1.4725322723388672s
+
+📷 Step 58/200
+[TIME] function get_frame -> elapsed 49.92938041687012ms
+[TIME] function _create_debug_2d -> elapsed 11.99960708618164ms
+[TIME] function process_frame -> elapsed 123.62098693847656ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 4 -> right | Status: 200
+[TIME] function send_command -> elapsed 75.28209686279297ms
+🎬 Ação: RGHT
+📊 State: (0.6125, 0.675, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 172.13153839111328ms
+Foi necessário parar programaticamente após 1.251121997833252s
+
+📷 Step 59/200
+[TIME] function get_frame -> elapsed 1781.3527584075928ms
+[TIME] function _create_debug_2d -> elapsed 10.712623596191406ms
+[TIME] function process_frame -> elapsed 116.1036491394043ms
+[TIME] function get_action -> elapsed 0.99945068359375ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 230.3614616394043ms
+🎬 Ação: FWD
+📊 State: (0.4625, 0.46875, 0.46875) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 213.8535976409912ms
+Foi necessário parar programaticamente após 1.463231086730957s
+
+📷 Step 60/200
+[TIME] function get_frame -> elapsed 103.04784774780273ms
+[TIME] function _create_debug_2d -> elapsed 11.077165603637695ms
+[TIME] function process_frame -> elapsed 122.5118637084961ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 76.55692100524902ms
+🎬 Ação: BWD
+📊 State: (0.38125, 0.0, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 100.13699531555176ms
+Foi necessário parar programaticamente após 1.1901767253875732s
+
+📷 Step 61/200
+[TIME] function get_frame -> elapsed 166.4712429046631ms
+[TIME] function _create_debug_2d -> elapsed 12.19034194946289ms
+[TIME] function process_frame -> elapsed 127.61974334716797ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 91.41421318054199ms
+🎬 Ação: FWD
+📊 State: (0.50625, 0.56875, 0.575) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 357.332706451416ms
+Foi necessário parar programaticamente após 1.4582960605621338s
+
+📷 Step 62/200
+[TIME] function get_frame -> elapsed 107.6509952545166ms
+[TIME] function _create_debug_2d -> elapsed 17.634868621826172ms
+[TIME] function process_frame -> elapsed 127.90751457214355ms
+[TIME] function get_action -> elapsed 1.0018348693847656ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 295.87364196777344ms
+🎬 Ação: BWD
+📊 State: (0.21875, 0.0, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 293.1654453277588ms
+Foi necessário parar programaticamente após 1.5955305099487305s
+
+📷 Step 63/200
+[TIME] function get_frame -> elapsed 814.7745132446289ms
+[TIME] function _create_debug_2d -> elapsed 11.112689971923828ms
+[TIME] function process_frame -> elapsed 116.73426628112793ms
+[TIME] function get_action -> elapsed 0.9825229644775391ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 479.8154830932617ms
+🎬 Ação: FWD
+📊 State: (0.6125, 0.56875, 0.5) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 2667.602300643921ms
+Foi necessário parar programaticamente após 4.161898612976074s
+
+📷 Step 64/200
+[TIME] function get_frame -> elapsed 78.55749130249023ms
+[TIME] function _create_debug_2d -> elapsed 13.000965118408203ms
+[TIME] function process_frame -> elapsed 117.97261238098145ms
+[TIME] function get_action -> elapsed 0.0ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 302.3073673248291ms
+🎬 Ação: BWD
+📊 State: (0.05625000000000002, 0.0, 0.0) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 97.68366813659668ms
+Foi necessário parar programaticamente após 1.4046423435211182s
+
+📷 Step 65/200
+[TIME] function get_frame -> elapsed 190.7198429107666ms
+[TIME] function _create_debug_2d -> elapsed 13.070106506347656ms
+[TIME] function process_frame -> elapsed 123.31056594848633ms
+[TIME] function get_action -> elapsed 1.0004043579101562ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 122.10392951965332ms
+🎬 Ação: FWD
+📊 State: (0.48750000000000004, 0.44999999999999996, 0.45625000000000004) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 235.6560230255127ms
+Foi necessário parar programaticamente após 1.3754444122314453s
+
+📷 Step 66/200
+[TIME] function get_frame -> elapsed 91.41659736633301ms
+[TIME] function _create_debug_2d -> elapsed 22.034645080566406ms
+[TIME] function process_frame -> elapsed 167.921781539917ms
+[TIME] function get_action -> elapsed 1.0652542114257812ms
+📡 Ação 2 -> back | Status: 200
+[TIME] function send_command -> elapsed 116.13082885742188ms
+🎬 Ação: BWD
+📊 State: (0.03749999999999998, 0.24375000000000002, 0.15625) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 111.39369010925293ms
+Foi necessário parar programaticamente após 1.2389311790466309s
+
+📷 Step 67/200
+[TIME] function get_frame -> elapsed 41.261911392211914ms
+[TIME] function _create_debug_2d -> elapsed 12.400388717651367ms
+[TIME] function process_frame -> elapsed 124.79114532470703ms
+[TIME] function get_action -> elapsed 1.0013580322265625ms
+📡 Ação 1 -> go | Status: 200
+[TIME] function send_command -> elapsed 165.98200798034668ms
+🎬 Ação: FWD
+📊 State: (0.525, 0.55625, 0.5434375000000046) | Target Cells: 0
+📡 Ação 0 -> stop | Status: 200
+[TIME] function send_command -> elapsed 163.1455421447754ms
+Foi necessário parar programaticamente após 1.3334417343139648s
+
+📷 Step 68/200
+[TIME] function get_frame -> elapsed 117.4321174621582ms
+[TIME] function _create_debug_2d -> elapsed 11.998891830444336ms
+[TIME] function process_frame -> elapsed 114.30859565734863ms
+[TIME] function get_action -> elapsed 0.0ms
+❌ Falha ao enviar comando: HTTPConnectionPool(host='192.168.1.11', port=80): Max retries exceeded with url: /back (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x0000023159638BE0>, 'Connection to 192.168.1.11 timed out. (connect timeout=5)'))
+[TIME] function send_command -> elapsed 5011.053085327148ms
+⛔ Falha crítica. Parando!
+
+🛑 Parando robô...
+❌ Falha ao enviar comando: HTTPConnectionPool(host='192.168.1.11', port=80): Max retries exceeded with url: /stop (Caused by ConnectTimeoutError(<urllib3.connection.HTTPConnection object at 0x00000231595FE7A0>, 'Connection to 192.168.1.11 timed out. (connect timeout=5)'))
+[TIME] function send_command -> elapsed 5016.666412353516ms
+✅ Operação finalizada!
+Estatísticas para função 'get_frame':
+        Tempo médio:  181.88294943641213 ms
+        Menor Tempo:  33.416748046875 ms
+        Maior Tempo:  2287.0421409606934 ms
+        Mediana :  78.16910743713379 ms
+================================================================================
+
+Estatísticas para função '_create_debug_2d':
+        Tempo médio:  12.843868311713724 ms
+        Menor Tempo:  10.157585144042969 ms
+        Maior Tempo:  25.80571174621582 ms
+        Mediana :  12.2298002243042 ms
+================================================================================
+
+Estatísticas para função 'process_frame':
+        Tempo médio:  125.75703859329224 ms
+        Menor Tempo:  107.20372200012207 ms
+        Maior Tempo:  167.921781539917 ms
+        Mediana :  122.66051769256592 ms
+================================================================================
+
+Estatísticas para função 'get_action':
+        Tempo médio:  0.5309125956367043 ms
+        Menor Tempo:  0.0 ms
+        Maior Tempo:  1.4808177947998047 ms
+        Mediana :  0.6989240646362305 ms
+================================================================================
+
+Estatísticas para função 'send_command':
+        Tempo médio:  284.7368243862601 ms
+        Menor Tempo:  65.66977500915527 ms
+        Maior Tempo:  5016.666412353516 ms
+        Mediana :  141.990065574646 ms
+================================================================================
