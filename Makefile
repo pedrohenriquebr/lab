@@ -70,17 +70,18 @@ data: requirements
 
 ## Evalue
 eval: 
-	$(PYTHON_INTERPRETER) evaluate.py
+	$(PYTHON_INTERPRETER) evaluate.py --name $(or $(NAME), default_run) --episodes $(or $(EPISODES), 50)
 
 
 ## Train
 train: 
-	$(PYTHON_INTERPRETER) train.py
+	$(PYTHON_INTERPRETER) train.py --name $(or $(NAME), default_run) --episodes $(or $(EPISODES), 50)
+
 
 
 ## Deploy
 deploy: 
-	$(PYTHON_INTERPRETER) deploy.py
+	$(PYTHON_INTERPRETER) deploy.py --name $(or $(NAME), default_run)
 
 #################################################################################
 # Self Documenting Commands                                                     #

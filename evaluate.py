@@ -1,7 +1,7 @@
 from esp32robot.agents import QAgent2D
 from esp32robot.config import MODEL_PATH, MODELS_DIR
 from esp32robot.simulation import Esp322DEnv
-
+import argparse
 
 def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05):
     """
@@ -9,7 +9,6 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05):
     """
     import os
     import time
-    import torch
 
     print(f"\n🎬 INICIANDO MODO DE AVALIAÇÃO (VISUAL)")
     
@@ -20,7 +19,8 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05):
     agent = QAgent2D(env.action_space, use_dqn=True)
     
     # 3. Carrega o Modelo
-    model_file_path = f"{MODELS_DIR}/{model_name}.pth"
+    model_file_path = str(MODELS_DIR / f"{model_name}.pth")
+
     if os.path.exists(model_file_path):
         agent.load(model_file_path)
     else:
@@ -73,7 +73,13 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05):
 
 
 if __name__ == "__main__":
-# ==========================================
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--name", type=str, default="model_default", help="Nome do experimento/modelo")
+    parser.add_argument("--episodes", type=int, default=50)
+    args = parser.parse_args()
+
+    print(f"🧪 Iniciando Experimento: {args.name}")
+    # ==========================================
     # EXECUTE ISTO PARA VER O ROBÔ ANDANDO
     # ==========================================
-    run_evaluation(model_name='q_table_pc_1', episodes=10)
+    run_evaluation(model_name=args.name, episodes=args.episodes)

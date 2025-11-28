@@ -1,12 +1,10 @@
 from pathlib import Path
-
 from loguru import logger
 from tqdm import tqdm
 import typer
-
 from esp32robot.agents import QAgent2D
 from esp32robot.config import FIGURES_DIR, PROCESSED_DATA_DIR
-
+import numpy as np
 app = typer.Typer()
 
 

@@ -24,7 +24,7 @@ class DQN(nn.Module):
 class QAgent2D:
     def __init__(self, action_space, use_dqn=False, batch_size=64):
         self.q_table = defaultdict(lambda: np.zeros(action_space.n))
-        self.lr = 0.1
+        self.lr = 0.0005
         self.gamma = 0.9
         self.epsilon = 1.0
         self.epsilon_decay = 0.995
@@ -46,7 +46,7 @@ class QAgent2D:
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.target_net.eval()
 
-            self.optimizer = optim.Adam(self.policy_net.parameters(), lr=0.0005)
+            self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.lr)
             self.loss_fn = nn.MSELoss()
             self.memory : list[tuple] = []
             self.batch_size = batch_size

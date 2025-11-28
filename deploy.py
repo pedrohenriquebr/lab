@@ -1,6 +1,7 @@
 import statistics
 import cv2
 import time
+import argparse
 
 # ==========================================
 # 4. LOOP PRINCIPAL DE OPERAÇÃO
@@ -26,7 +27,7 @@ def run_real_robot(model_name='q_table_pc', epsilon=0.05, max_steps=100):
     print("="*60)
     global history_executions
     history_executions.clear()  # <--- ADICIONE ISSO
-    model_file_path = f"{MODELS_DIR/model_name}.pth"
+    model_file_path = str(MODELS_DIR / f"{model_name}.pth")
 
     # Inicializa agente e controller
     agent = DeployedAgent(model_file_path, epsilon=epsilon, is_2d_model=True)
@@ -120,4 +121,10 @@ def run_real_robot(model_name='q_table_pc', epsilon=0.05, max_steps=100):
 # 🔴 MODO EXPLOTAÇÃO: 100% política aprendida (não explora)
 
 if __name__ == "__main__":
-    run_real_robot(model_name='q_table_pc_1', epsilon=0.0, max_steps=200)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--name", type=str, default="model_default", help="Nome do experimento/modelo")
+    parser.add_argument("--steps", type=int, default=50)
+    args = parser.parse_args()
+    
+    print(f"🧪 Iniciando Experimento: {args.name}")
+    run_real_robot(model_name=args.name, epsilon=0.0, max_steps=args.steps)
