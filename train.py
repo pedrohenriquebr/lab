@@ -3,7 +3,6 @@ import time
 import numpy as np
 import torch
 import argparse
-import subprocess
 import mlflow
 from datetime import datetime, timedelta
 from contextlib import nullcontext # <--- O SALVADOR DA PÁTRIA
@@ -12,6 +11,8 @@ from esp32robot.config import COLAB_MODE, MODELS_DIR
 from esp32robot.simulation import Esp322DEnv
 from esp32robot.agents import QAgent2D
 from IPython.display import clear_output
+
+from esp32robot.utils import get_git_info
 
 class TrainingTimer:
     def __init__(self, total_episodes, display_every=10):
@@ -50,13 +51,7 @@ class TrainingTimer:
         finish = datetime.now() + timedelta(seconds=est)
         return f"⏱️ ETA: {time_str} (~{finish.strftime('%H:%M')}) | Ep {current_episode+1}/{self.total_episodes}"
 
-def get_git_info():
-    try:
-        commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).strip().decode('utf-8')
-        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip().decode('utf-8')
-        return commit, branch
-    except:
-        return "unknown", "unknown"
+
 
 def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=32, display_every=5, 
                 learning_rate=0.0005,

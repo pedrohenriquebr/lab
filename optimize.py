@@ -1,5 +1,6 @@
 import optuna
 import mlflow
+from esp32robot.utils import get_git_info
 from train import train_agent
 
 def objective(trial: optuna.Trial):
@@ -54,6 +55,10 @@ if __name__ == "__main__":
     
     # Inicia a Run "Pai"
     with mlflow.start_run(run_name="Optuna_Session_v2"):
+        git_commit, git_branch = get_git_info()
+        mlflow.set_tag("git.commit", git_commit)
+        mlflow.set_tag("git.branch", git_branch)
+        mlflow.set_tag("user", "Pedro")
         study = optuna.create_study(direction="maximize")
         study.optimize(objective, n_trials=10) # Roda 20 testes
         
