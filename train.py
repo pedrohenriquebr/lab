@@ -2,14 +2,16 @@ import os
 import time
 import numpy as np
 import torch
+import argparse
+import subprocess
+import mlflow
+from datetime import datetime, timedelta
+from contextlib import nullcontext # <--- O SALVADOR DA PÁTRIA
+
 from esp32robot.config import COLAB_MODE, MODELS_DIR
 from esp32robot.simulation import Esp322DEnv
 from esp32robot.agents import QAgent2D
 from IPython.display import clear_output
-from datetime import datetime, timedelta
-import argparse
-import mlflow
-import subprocess
 
 class TrainingTimer:
     def __init__(self, total_episodes, display_every=10):
@@ -35,35 +37,20 @@ class TrainingTimer:
 
     def get_estimate(self, current_episode):
         self.last_display = current_episode
-
-        if not self.episode_times:
-            return "Calculando velocidade..."
-
-        avg_time_per_ep = sum(self.episode_times) / len(self.episode_times)
-        episodes_left = self.total_episodes - (current_episode + 1)
-        estimated_seconds = episodes_left * avg_time_per_ep
-
-        if estimated_seconds < 60:
-            time_str = f"{estimated_seconds:.0f}s"
-        elif estimated_seconds < 3600:
-            mins = estimated_seconds / 60
-            time_str = f"{mins:.1f}min"
-        else:
-            hours = estimated_seconds / 3600
-            time_str = f"{hours:.1f}h"
-
-        eps_per_sec = 1.0 / avg_time_per_ep
-        finish_time = datetime.now() + timedelta(seconds=estimated_seconds)
-
-        return (
-            f"⏱️  ETA: {time_str} (~{finish_time.strftime('%H:%M')}) | "
-            f"Ep {current_episode+1}/{self.total_episodes} | "
-            f"{eps_per_sec:.2f} ep/s | {avg_time_per_ep:.2f}s/ep"
-        )
-
+        if not self.episode_times: return "Calculando..."
+        
+        avg = sum(self.episode_times) / len(self.episode_times)
+        left = self.total_episodes - (current_episode + 1)
+        est = left * avg
+        
+        if est < 60: time_str = f"{est:.0f}s"
+        elif est < 3600: time_str = f"{est/60:.1f}min"
+        else: time_str = f"{est/3600:.1f}h"
+        
+        finish = datetime.now() + timedelta(seconds=est)
+        return f"⏱️ ETA: {time_str} (~{finish.strftime('%H:%M')}) | Ep {current_episode+1}/{self.total_episodes}"
 
 def get_git_info():
-    """Pega o hash do commit e a branch atual"""
     try:
         commit = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).strip().decode('utf-8')
         branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).strip().decode('utf-8')
@@ -71,56 +58,73 @@ def get_git_info():
     except:
         return "unknown", "unknown"
 
-def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=32, display_every=5):
-    """Função wrapper para treinar no Colab"""
-
-    # Limpa arquivos debug antigos
-    #!rm -f /content/debug_step_*.png
+def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=32, display_every=5, 
+                learning_rate=0.0005,
+                epsilon_decay=0.98):
     
-    mlflow.set_experiment("ESP32_Robot_Navigation_2D")
+    # Configura experimento
     
-    git_commit, git_branch = get_git_info()
+    # --- LÓGICA DE CONTEXTO ---
+    # Se já existe uma Run ativa (Optuna), usamos nullcontext (não faz nada)
+    # Se não existe, usamos mlflow.start_run (cria nova)
+    active_run = mlflow.active_run()
+    if active_run:
+        print(f"🔄 Anexando à Run existente: {active_run.info.run_id}")
+        run_context = nullcontext()
+    else:
+        mlflow.set_experiment("ESP32_Robot_Navigation_2D")
+        run_name = f"{model_name}_{int(time.time())}"
+        print(f"✨ Criando nova Run: {run_name}")
+        run_context = mlflow.start_run(run_name=run_name)
+
+    # Inicializa variáveis fora do try para garantir acesso no finally
+    agent = None
+    env = None
+    reward_history = []
     
-    with mlflow.start_run(run_name=f"{model_name}_{int(time.time())}"):
-        
-        mlflow.set_tag("git.commit", git_commit)
-        mlflow.set_tag("git.branch", git_branch)
-        mlflow.set_tag("user", "Pedro")
-        # Cria ambiente e agente
-        env = Esp322DEnv(render_mode="human")
-        agent = QAgent2D(env.action_space, use_dqn=True, batch_size=batch_size)
-        agent.epsilon_decay = 0.98    # Carrega modelo existente (se houver)
-        model_file_path = str(MODELS_DIR / f"{model_name}.pth")
-        
-        params = {
-            "episodes": episodes,
-            "max_steps": max_steps,
-            "batch_size": batch_size,
-            "epsilon_decay": agent.epsilon_decay, # Pegue do agente se possível
-            "optimizer": "Adam",
-            "learning_rate": agent.lr,
-            "architecture": "DQN_3_64_64_5"
-        }
-        mlflow.log_params(params)
-
-        if os.path.exists(model_file_path):
-            agent.load(model_file_path)
-            agent.target_net.load_state_dict(agent.policy_net.state_dict())
-            print("✅ Modelo existente carregado!")
-
-        timer = TrainingTimer(total_episodes=episodes, display_every=display_every)
-        reward_history = []
-        
-
+    # Inicia o bloco MLflow (seja ele novo ou existente)
+    with run_context:
         try:
-            print("\n" + "="*60)
-            print("🚀 Iniciando Treino com MLflow...")
-            print(f"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
-            print(f"Meta: {episodes} episódios, {max_steps} steps/época")
-            print("="*60 + "\n")
+            # Logs de Ambiente
+            git_commit, git_branch = get_git_info()
+            mlflow.set_tag("git.commit", git_commit)
+            mlflow.set_tag("git.branch", git_branch)
+            mlflow.set_tag("user", "Pedro")
+            
+            # Inicialização
+            env = Esp322DEnv(render_mode="human")
+            
+            # Nota: Certifique-se que seu QAgent2D aceita 'lr' e 'epsilon_decay' no __init__
+            # Se não aceitar, definimos manualmente abaixo
+            agent = QAgent2D(env.action_space, use_dqn=True, batch_size=batch_size)
+            agent.lr = learning_rate          # Força atualização
+            agent.optimizer.param_groups[0]['lr'] = learning_rate # Atualiza otimizador
+            agent.epsilon_decay = epsilon_decay # Força atualização
+            
+            model_file_path = str(MODELS_DIR / f"{model_name}.pth")
 
+            # Log de Parâmetros
+            mlflow.log_params({
+                "episodes": episodes,
+                "max_steps": max_steps,
+                "batch_size": batch_size,
+                "epsilon_decay": epsilon_decay,
+                "learning_rate": learning_rate,
+                "architecture": "DQN_3_64_64_5"
+            })
 
+            # Carregar existente?
+            if os.path.exists(model_file_path):
+                agent.load(model_file_path) # Seu load adiciona .pth
+                if hasattr(agent, 'target_net'):
+                    agent.target_net.load_state_dict(agent.policy_net.state_dict())
+                print("✅ Modelo carregado!")
 
+            timer = TrainingTimer(total_episodes=episodes, display_every=display_every)
+            
+            print(f"\n🚀 Treino Iniciado: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
+
+            # Loop Principal
             for ep in range(episodes):
                 timer.start_episode()
                 obs, _ = env.reset()
@@ -130,57 +134,55 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                 for step in range(max_steps):
                     action = agent.get_action(obs)
                     next_obs, reward, done, _, _ = env.step(action)
-                    time.sleep(0.03)
-                    loss = agent.update(obs, action, reward, next_obs)
-                    if loss is not None and loss != 0:
-                        episode_losses.append(loss)
-                        mlflow.log_metric("step_loss", loss, step=ep*max_steps+step)
                     
-                    mlflow.log_metric("step_reward", reward, step=ep*max_steps+step)
+                    # time.sleep(0.01) # Pequeno delay para visualização se necessário
+                    
+                    loss = agent.update(obs, action, reward, next_obs)
+                    if loss and loss != 0:
+                        episode_losses.append(loss)
+                        # Log detalhado (cuidado com tamanho do log)
+                        # mlflow.log_metric("step_loss", loss, step=ep*max_steps+step)
+
                     obs = next_obs
                     total_reward += reward
-
-                    if done:
-                        break
+                    if done: break
 
                 reward_history.append(total_reward)
 
-                # Decaimento do Epsilon
                 if agent.epsilon > agent.min_epsilon:
                     agent.epsilon *= agent.epsilon_decay
 
                 avg_loss = np.mean(episode_losses) if episode_losses else 0
                 
+                # Log de Métricas por Episódio
                 mlflow.log_metrics({
                     "reward": total_reward,
                     "avg_loss": avg_loss,
                     "epsilon": agent.epsilon
                 }, step=ep)
 
-                # Display no Colab
                 if timer.end_episode(ep):
-                    if COLAB_MODE:
-                        clear_output(wait=True)
-                    
-                    print(timer.get_estimate(ep))
-                    print(f"   └─ Reward: {total_reward:>6.1f} | Loss: {avg_loss:>6.3f} | Epsilon: {agent.epsilon:.3f}")
-                    print(f"   └─ Últimos 10 Rewards: {np.mean(reward_history[-10:]):.1f} (média)")
+                    if COLAB_MODE: clear_output(wait=True)
+                    print(f"{timer.get_estimate(ep)} | R: {total_reward:6.1f} | L: {avg_loss:6.4f} | Eps: {agent.epsilon:.2f}")
                     agent.plot_training_results()
 
-
-            print("\n✅ Treinamento concluído!")
+            print("\n✅ Treino concluído!")
+            
+            # Salvar Artefatos Finais
+            agent.save(model_file_path) # Seu save adiciona .pth
+            mlflow.log_artifact(model_file_path)
+            
             return agent, env, reward_history
 
         except KeyboardInterrupt:
-            print("\n⛔ Treinamento interrompido!")
+            print("\n⛔ Interrompido pelo usuário!")
+            if agent:
+                agent.save(model_file_path)
+                print("💾 Modelo salvo antes de sair.")
             return agent, env, reward_history
+            
         finally:
-            # Salva modelo final
-            agent.save(model_file_path)
-            mlflow.log_artifact(model_file_path)
-            print(f"✅ Treino finalizado! Modelo salvo no MLflow.")
-            env.close()
-
+            if env: env.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
