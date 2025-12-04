@@ -76,6 +76,9 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
     agent = None
     env = None
     reward_history = []
+    crash_rate_history = []
+    idle_rate_history = []
+    avg_distance_history = []
     
     # Inicia o bloco MLflow (seja ele novo ou existente)
     with run_context:
@@ -125,10 +128,15 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                 obs, _ = env.reset()
                 total_reward = 0
                 episode_losses = []
+                total_idle_steps = 0
+                did_crash = 0
+                max_dist = 0
+                dist_history=[]
+                crash_history=[]
 
                 for step in range(max_steps):
                     action = agent.get_action(obs)
-                    next_obs, reward, done, _, _ = env.step(action)
+                    next_obs, reward, done, _, info = env.step(action)
                     
                     # time.sleep(0.01) # Pequeno delay para visualização se necessário
                     
@@ -140,20 +148,38 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
 
                     obs = next_obs
                     total_reward += reward
+                    total_idle_steps += 1 if info['is_idle'] else 0
+                    did_crash = 1 if info['collision'] else 0
+                    max_dist = max(max_dist, info['dist_traveled'])
+                    dist_history.append(max_dist)
+                    crash_history.append(did_crash)
+                    
+                    
                     if done: break
 
-                reward_history.append(total_reward)
 
                 if agent.epsilon > agent.min_epsilon:
                     agent.epsilon *= agent.epsilon_decay
 
                 avg_loss = np.mean(episode_losses) if episode_losses else 0
+                avg_distance = np.mean(dist_history) if dist_history else 0
+                idle_ratio = total_idle_steps / max_steps
+                crash_rate = sum(crash_history) / max_steps
+                
+                
+                avg_distance_history.append(avg_distance)
+                idle_rate_history.append(idle_ratio)
+                crash_rate_history.append(crash_rate)
+                reward_history.append(total_reward)
                 
                 # Log de Métricas por Episódio
                 mlflow.log_metrics({
                     "reward": total_reward,
                     "avg_loss": avg_loss,
-                    "epsilon": agent.epsilon
+                    "epsilon": agent.epsilon,
+                    "idle_ratio": idle_ratio,
+                    "crash_rate": crash_rate,
+                    "avg_distance": avg_distance
                 }, step=ep)
 
                 if timer.end_episode(ep):
@@ -163,18 +189,33 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
 
             print("\n✅ Treino concluído!")
             
+            metrics = {
+                'reward_history': reward_history,
+                'crash_rate_history': crash_rate_history,
+                'idle_rate_history': idle_rate_history,
+                'avg_distance_history': avg_distance_history,
+            }
+            
             # Salvar Artefatos Finais
             agent.save(model_file_path) # Seu save adiciona .pth
             mlflow.log_artifact(model_file_path)
             
-            return agent, env, reward_history
+            return agent, env, metrics
 
         except KeyboardInterrupt:
             print("\n⛔ Interrompido pelo usuário!")
             if agent:
                 agent.save(model_file_path)
                 print("💾 Modelo salvo antes de sair.")
-            return agent, env, reward_history
+            
+            metrics = {
+                'reward_history': reward_history,
+                'crash_rate_history': crash_rate_history,
+                'idle_rate_history': idle_rate_history,
+                'avg_distance_history': avg_distance_history,
+            }
+            
+            return agent, env, metrics
             
         finally:
             if env: env.close()
@@ -192,7 +233,7 @@ if __name__ == "__main__":
 
     print(f"🧪 Iniciando Experimento: {args.name}")
 
-    AGENTE_TREINADO, AMBIENTE, HISTORICO = train_agent(
+    AGENTE_TREINADO, AMBIENTE, METRICAS = train_agent(
         model_name=args.name, # Passa o nome limpo
         episodes=args.episodes,
         max_steps=args.max_steps,
@@ -201,8 +242,8 @@ if __name__ == "__main__":
     )
 
     print("\n📊 Resultado Final:")
-    print(f"Média de Recompensa Final: {np.mean(HISTORICO[-10:]):.1f}")
+    print(f"Média de Recompensa Final: {np.mean(METRICAS['reward_history'][-10:]):.1f}")
     print("Modelo salvo em: q_table_pc.pth")
     print("Gráfico salvo em: loss_chart.png")
     print('Historico de recompensas: ')
-    print(HISTORICO[:50])
+    print(METRICAS['reward_history'][:50])
