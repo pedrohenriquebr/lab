@@ -19,7 +19,7 @@ EXTERNAL_DATA_DIR = DATA_DIR / "external"
 
 MODELS_DIR = PROJ_ROOT / "models"
 MODEL_PATH = MODELS_DIR / "q_table_pc"
-
+BEST_MODEL = "opt_reward_tuning_trial_021"
 REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 COLAB_MODE = False  # 🔴 IMPORTANTE: True para Colab, False para PC local
