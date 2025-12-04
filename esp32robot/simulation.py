@@ -37,6 +37,9 @@ class Esp322DEnv(gym.Env):
         # Reinicia posição
         self.car_pos = np.array([3.0, 3.0])
         self.car_angle = random.uniform(0, 2 * math.pi)
+        self.steps_idle = 0       # Passos que ele ficou parado/girando
+        self.collision_count = 0  # Colisões (se o episódio não acabar na primeira)
+        self.last_pos = self.car_pos.copy()
         
         # Gera obstáculos aleatórios (Círculos)
         self.obstacles = []
@@ -81,6 +84,16 @@ class Esp322DEnv(gym.Env):
                 break
 
         self._update_sensors()
+        
+        # distância euclidiana
+        dist_moved = np.linalg.norm(self.car_pos - self.last_pos)
+        if dist_moved < 0.01: # Se moveu menos de 1cm
+            self.steps_idle += 1
+        self.last_pos = self.car_pos.copy()
+
+        # 2. Detectar Colisão
+        if collided:
+            self.collision_count = 1 # Ou += 1 se o robô não morrer na batida
         
         # --- Recompensa ---
        # Lembrando: 0.0 = Colado, 1.0 = Livre
@@ -132,10 +145,13 @@ class Esp322DEnv(gym.Env):
                 elif action == 0: # STOP
                     reward -= 0.05
                 elif action in [3, 4]: # TURNS
-                    reward -= 0.02 # Custo pequeno para não ficar dançando
+                    reward -= 0.05 # Custo pequeno para não ficar dançando
                 elif action == 2: # BACK
                     reward -= 0.1 # Ré sem motivo é ruim
 
+            
+            if dist_moved < 0.01:
+                reward -= 0.1
             # 4. PENALIDADE POR PROXIMIDADE GERAL (Safety Margin)
             # Isso ajuda ele a não andar "raspando" na parede
             min_reading = min(self.sensors)
@@ -146,8 +162,16 @@ class Esp322DEnv(gym.Env):
         if self.render_mode == "human":
             self.render()
 
+        dist_from_start = np.linalg.norm(self.car_pos - np.array([3.0, 3.0]))
         
-        return self._get_obs(), reward, terminated, False, {}
+        info = {
+            "is_idle": dist_moved < 0.01,
+            "collision": collided,
+            "dist_traveled": dist_from_start
+        }
+
+        
+        return self._get_obs(), reward, terminated, False, info
 
     def _get_obs(self):
         # Retorna array numpy float32
