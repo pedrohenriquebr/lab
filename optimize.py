@@ -6,10 +6,10 @@ import numpy as np
 
 def objective(trial: optuna.Trial):
     # 1. Sugestão de Parâmetros
-    lr = trial.suggest_float("learning_rate", 1e-5, 1e-1, log=True)
-    batch_size = trial.suggest_categorical("batch_size", [128, 256])
-    epsilon_decay = trial.suggest_float("epsilon_decay", 0.95, 0.98)
-    max_steps = trial.suggest_int('max_steps', 200, 300, step=25)
+    lr = trial.suggest_float("learning_rate", 5e-6, 1e-5, log=True)
+    batch_size = trial.suggest_categorical("batch_size", [128])
+    epsilon_decay = trial.suggest_float("epsilon_decay", 0.93, 0.95, step=0.005)
+    max_steps = trial.suggest_int('max_steps', 200, 250, step=25)
     
     # 2. Nome do Modelo (Padrão ID Curto)
     # Ex: opt_trial_005
@@ -28,7 +28,7 @@ def objective(trial: optuna.Trial):
         # Nota: Seu train_agent precisa aceitar esses argumentos novos!
         agent, env, metrics = train_agent(
             model_name=trial_name,  # O nome limpo
-            episodes=30,
+            episodes=50,
             max_steps=max_steps,
             batch_size=batch_size,
             learning_rate=lr,      
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     mlflow.set_experiment("ESP32_Optuna_Tuning")
     
     # Inicia a Run "Pai"
-    with mlflow.start_run(run_name="Optuna_Session_v3_Reward_Tuning"):
+    with mlflow.start_run(run_name="Optuna_Session_v4_Reward_Tuning"):
         git_commit, git_branch = get_git_info()
         mlflow.set_tag("git.commit", git_commit)
         mlflow.set_tag("git.branch", git_branch)

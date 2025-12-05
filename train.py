@@ -133,11 +133,13 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                 max_dist = 0
                 dist_history=[]
                 crash_history=[]
+                action_counts = {0:0, 1:0, 2:0, 3:0, 4:0}
+
 
                 for step in range(max_steps):
                     action = agent.get_action(obs)
                     next_obs, reward, done, _, info = env.step(action)
-                    
+                    action_counts[action] += 1
                     # time.sleep(0.01) # Pequeno delay para visualização se necessário
                     
                     loss = agent.update(obs, action, reward, next_obs)
@@ -157,7 +159,9 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                     
                     if done: break
 
-
+                
+                
+                
                 if agent.epsilon > agent.min_epsilon:
                     agent.epsilon *= agent.epsilon_decay
 
@@ -165,6 +169,7 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                 avg_distance = np.mean(dist_history) if dist_history else 0
                 idle_ratio = total_idle_steps / max_steps
                 crash_rate = sum(crash_history) / max_steps
+                total_actions = sum(action_counts.values())
                 
                 
                 avg_distance_history.append(avg_distance)
@@ -181,6 +186,16 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                     "crash_rate": crash_rate,
                     "avg_distance": avg_distance
                 }, step=ep)
+                
+                
+                if total_actions > 0:
+                    mlflow.log_metrics({
+                        "act_stop_pct": action_counts[0] / total_actions,
+                        "act_fwd_pct": action_counts[1] / total_actions,
+                        "act_back_pct": action_counts[2] / total_actions,
+                        "act_left_pct": action_counts[3] / total_actions,
+                        "act_right_pct": action_counts[4] / total_actions
+                    }, step=ep)
 
                 if timer.end_episode(ep):
                     if COLAB_MODE: clear_output(wait=True)
