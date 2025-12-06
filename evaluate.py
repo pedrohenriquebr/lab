@@ -2,18 +2,20 @@ from esp32robot.agents import QAgent2D
 from esp32robot.config import MODEL_PATH, MODELS_DIR
 from esp32robot.simulation import Esp322DEnv
 import argparse
+import numpy as np 
 
-def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05):
+def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=True) -> tuple[float, dict[int, int], float]: 
     """
     Carrega um modelo treinado e roda visualmente sem treinar.
     """
     import os
     import time
+    mode = "human" if not headless else None
+    if not headless:
+        print(f"\n🎬 INICIANDO MODO DE AVALIAÇÃO (VISUAL)")
 
-    print(f"\n🎬 INICIANDO MODO DE AVALIAÇÃO (VISUAL)")
-    
     # 1. Cria o ambiente com renderização HUMAN (Janela PyGame)
-    env = Esp322DEnv(render_mode="human", env_type='circular_race_track')
+    env = Esp322DEnv(render_mode=mode, env_type='default')
     
     # 2. Cria o agente (mesma configuração do treino)
     agent = QAgent2D(env.action_space, use_dqn=True)
@@ -26,12 +28,16 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05):
     else:
         print(f"❌ Erro: Arquivo {model_name}.pth não encontrado!")
         env.close()
-        return
+        return 0, {}, 0
 
     # 4. CONFIGURAÇÃO CRÍTICA PARA AVALIAÇÃO
     agent.epsilon = 0.0       # 0% de aleatoriedade (Pura inteligência)
     agent.policy_net.eval()   # Coloca o PyTorch em modo de inferência
-    actions = {}
+    stats: dict[str, object] = {
+        "rewards": [],
+        "actions": {0:0, 1:0, 2:0, 3:0, 4:0},
+        "success_counts": 0
+    }
     
     try:
         for ep in range(episodes):
@@ -45,47 +51,61 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05):
             while not done:
                 # Pega a melhor ação possível (sem sorteio)
                 action = agent.get_action(obs)
-                actions[action] = actions.get(action, 0) + 1
+                stats["actions"][action] = stats["actions"].get(action, 0) + 1
                 
                 # Executa no ambiente
                 next_obs, reward, done, _, _ = env.step(action)
-                
-                # NÃO CHAMAMOS agent.update() AQUI!
                 
                 obs = next_obs
                 total_reward += reward
                 step += 1
                 
                 # Delay para o olho humano conseguir acompanhar
-                time.sleep(delay)
+                if not headless:
+                    time.sleep(delay)
                 
                 # Se demorar demais (loop infinito), corta
                 if step > 500:
-                    print("   ⚠️ Forçando fim do episódio (timeout).")
+                    if not headless:
+                        print("   ⚠️ Forçando fim do episódio (timeout).")
                     break
+           
+            stats['success_counts'] += 1 if not done and reward > 0 else 0 # type: ignore
+            stats['rewards'].append(total_reward) # type: ignore
             
-            print(f"   🏁 Fim! Reward Total: {total_reward:.1f} | Steps: {step}")
-            time.sleep(1) # Pausa entre episódios
+            if not headless:
+                print(f"   🏁 Fim! Reward Total: {total_reward:.1f} | Steps: {step}")
+                time.sleep(0.05) 
 
     except KeyboardInterrupt:
         print("\n⛔ Avaliação interrompida!")
     finally:
         env.close()
+        
+        if headless:
+            return np.mean(stats["rewards"]), stats["actions"], stats["success_counts"]/episodes # type: ignore
+    
         print("\n🎬 Modo de Avaliação finalizado.")
         # formatar melhor a visualização com porcentagem
-        total_actions = sum(actions.values())
-        # FWD
-        # BACK  
-        # LEFT
-        # RIGHT
+        total_actions = sum(stats["actions"].values()) # type: ignore
         action_names = {
             0:'Stop', 1:'Fwd', 2:'Back', 3:'Left', 4:'Right'
         }
         print("📊 Estatísticas de Ações Executadas:")
-        for action, count in actions.items():
+        for action, count in stats["actions"].items(): # type: ignore
             percentage = (count / total_actions) * 100 if total_actions > 0 else 0
             print(f"   Ação {action_names[action]}: {count} vezes ({percentage:.2f}%)")
+            
+        avg_reward = np.mean(stats["rewards"]) # type: ignore
+        success_rate = (stats["success_counts"] / episodes) * 100 # type: ignore
+        print(f"\n📈 Recompensa Média por Episódio: {avg_reward:.2f}")
+        print(f"🏆 Taxa de Sucesso: {success_rate:.2f}% ({stats['success_counts']} de {episodes})")
+        
         print("✅ Janela fechada.")
+        return avg_reward, stats["actions"], success_rate/100 # type: ignore
+            
+            
+    
 
 
 if __name__ == "__main__":
@@ -99,4 +119,4 @@ if __name__ == "__main__":
     # ==========================================
     # EXECUTE ISTO PARA VER O ROBÔ ANDANDO
     # ==========================================
-    run_evaluation(model_name=args.name, episodes=args.episodes, delay=args.delay)
+    run_evaluation(model_name=args.name, episodes=args.episodes, delay=args.delay, headless=False)

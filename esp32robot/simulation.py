@@ -8,7 +8,7 @@ import random
 class Esp322DEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, env_type='default'):
+    def __init__(self, render_mode=None, env_type='default', rotation_penalty=0.1):
         self.window_size = 600  # Tamanho da janela (pixels)
         self.map_scale = 100    # 100 pixels = 1 metro (Mundo de 6x6 metros)
         
@@ -18,6 +18,7 @@ class Esp322DEnv(gym.Env):
         self.render_mode = render_mode
         self.window = None
         self.clock = None
+        self.rotation_penalty = rotation_penalty
         
         # Action Space: 0:Stop, 1:Fwd, 2:Back, 3:Left, 4:Right
         self.action_space = spaces.Discrete(5)
@@ -198,13 +199,12 @@ class Esp322DEnv(gym.Env):
                 else: reward -= 0.1
             else:
                 if action == 1: reward += 0.2
-                elif action == 0: reward -= 0.05
-                elif action in [3, 4]: reward -= 0.05
-                elif action == 2: reward -= 0.1
+                elif action == 0: reward -= 0.5
+                elif action == 2: reward -= 0.5
 
             # Penalidade se não sair do lugar (Anti-Trapaça)
             if dist_moved < 0.01:
-                reward -= 0.1
+                reward -= 0.2
             
             # Penalidade de proximidade
             min_reading = min(self.sensors)
