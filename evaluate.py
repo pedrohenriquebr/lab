@@ -4,7 +4,7 @@ from esp32robot.simulation import Esp322DEnv
 import argparse
 import numpy as np 
 
-def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=True) -> tuple[float, dict[int, int], float]: 
+def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=True, show_results=False) -> tuple[float, dict[int, int], float]: 
     """
     Carrega um modelo treinado e roda visualmente sem treinar.
     """
@@ -82,7 +82,7 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=Tru
     finally:
         env.close()
         
-        if headless:
+        if headless and not show_results:
             return np.mean(stats["rewards"]), stats["actions"], stats["success_counts"]/episodes # type: ignore
     
         print("\n🎬 Modo de Avaliação finalizado.")
@@ -111,12 +111,15 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=Tru
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, default="model_default", help="Nome do experimento/modelo")
-    parser.add_argument("--episodes", type=int, default=50)
+    parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--delay", type=float, default=0.00, help="Delay entre passos em segundos")
+    parser.add_argument("--headless", action="store_true", help="Headless mode (no GUI)")
+    parser.add_argument("--show-results", action="store_true", help="Show detailed results after evaluation")
+    
     args = parser.parse_args()
 
     print(f"🧪 Iniciando Experimento: {args.name}")
     # ==========================================
     # EXECUTE ISTO PARA VER O ROBÔ ANDANDO
     # ==========================================
-    run_evaluation(model_name=args.name, episodes=args.episodes, delay=args.delay, headless=False)
+    run_evaluation(model_name=args.name, episodes=args.episodes, delay=args.delay, headless=args.headless, show_results=args.show_results)

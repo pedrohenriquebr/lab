@@ -5,10 +5,19 @@ import pygame
 import math
 import random
 
+ACTIONS_INDEX = {
+    'STOP': 0,
+    'FORWARD': 1,
+    'BACK': 2,
+    'LEFT': 3,
+    'RIGHT': 4
+}
+
+
 class Esp322DEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, env_type='default', rotation_penalty=0.1):
+    def __init__(self, render_mode=None, env_type='default', rotation_penalty=0.1, action_weights=None):
         self.window_size = 600  # Tamanho da janela (pixels)
         self.map_scale = 100    # 100 pixels = 1 metro (Mundo de 6x6 metros)
         
@@ -19,6 +28,8 @@ class Esp322DEnv(gym.Env):
         self.window = None
         self.clock = None
         self.rotation_penalty = rotation_penalty
+        self.action_weights = action_weights if action_weights is not None else {0:0, 1:0, 2:0, 3:0, 4:0}
+        self.last_action = 0
         
         # Action Space: 0:Stop, 1:Fwd, 2:Back, 3:Left, 4:Right
         self.action_space = spaces.Discrete(5)
@@ -201,7 +212,12 @@ class Esp322DEnv(gym.Env):
                 if action == 1: reward += 0.2
                 elif action == 0: reward -= 0.5
                 elif action == 2: reward -= 0.5
-
+            
+            if (self.last_action == 3 and action == 4) or (self.last_action == 4 and action == 3) or (action == 1 and self.last_action == 2) or (action == 2 and self.last_action == 1):
+                reward -= 0.4 # Punição severa por indecisão!
+            self.last_action = action
+            reward += self.action_weights.get(action, 0)
+            
             # Penalidade se não sair do lugar (Anti-Trapaça)
             if dist_moved < 0.01:
                 reward -= 0.2
