@@ -9,19 +9,34 @@ import numpy as np
 SESSION_ID = int(time.time())
 
 def objective(trial: optuna.Trial):
-    # 1. Sugestão de Parâmetros (LR Aumentado!)
-    lr = trial.suggest_float("learning_rate", 1e-4, 1e-3, log=True) 
+    # 1. Sugestão de Parâmetros (Ajustados para Stacking + Latência)
+    
+    # Learning Rate (DQN)
+    lr = trial.suggest_float("learning_rate", 5e-5, 1e-3, log=True)
+    
+    # Batch Size
     batch_size = trial.suggest_categorical("batch_size", [64, 128])
-    episodes = trial.suggest_int("episodes", 50, 150, step=25) # Dei um pouco mais de tempo
-    epsilon_decay = trial.suggest_float("epsilon_decay", 0.90, 0.98, step=0.01)
-    max_steps = trial.suggest_int('max_steps', 200, 400, step=50)
-    # rot_penalty = trial.suggest_float("rotation_penalty", 0.0005, 0.02, step=0.0005)
     
-    # 2. Nome do Modelo (Padrão ID Curto)
-    # Ex: opt_trial_005
-    trial_name = f"opt_v4_{SESSION_ID}_trial_{trial.number:03d}"
+    # Fator de Desconto (Gamma) - Importante para latência
+    gamma = trial.suggest_float("gamma", 0.90, 0.99)
     
-    print(f"\n🔄 Iniciando Trial {trial.number}: LR={lr:.5f}, Batch={batch_size}")
+    # Epsilon Decay
+    epsilon_decay = trial.suggest_float("epsilon_decay", 0.90, 0.99)
+    
+    # Duração do episódio
+    max_steps = trial.suggest_int('max_steps', 250, 400, step=50)
+    
+    stack_size = trial.suggest_int("stack_size", 3, 8)
+    latency_steps = 5
+    
+    # Rotation Penalty (Fixamos em um valor baixo apenas para evitar dança)
+    # Não otimizamos mais isso, pois o anti-jitter do env já cuida do grosso
+    ROTATION_PENALTY = 0.01 
+    
+    # Nome do Trial
+    trial_name = f"opt_v5_latency_{SESSION_ID}_trial_{trial.number:03d}"
+    
+    print(f"\n🔄 Iniciando Trial {trial.number}: LR={lr:.5f}, Gamma={gamma:.3f}, Batch={batch_size}")
 
     # 3. Integração MLflow (Nested Run)
     # nested=True faz essa run ficar "dentro" da run principal do Optuna
@@ -34,24 +49,28 @@ def objective(trial: optuna.Trial):
         # Nota: Seu train_agent precisa aceitar esses argumentos novos!
         agent, env, metrics = train_agent(
             model_name=trial_name,  # O nome limpo
-            episodes=episodes,
+            episodes=60,            # 60 episódios para dar tempo de aprender latência
             max_steps=max_steps,
             batch_size=batch_size,
             learning_rate=lr,      
             epsilon_decay=epsilon_decay,
-            rotation_penalty=0,
-            headless=True
+            rotation_penalty=ROTATION_PENALTY,
+            headless=True,
+            gamma=gamma,
+            stack_size=stack_size,
+            latency_steps=latency_steps
+            # O train_agent precisa passar gamma para o agente internamente
+            # Se não passar, vamos confiar no padrão ou injetar (ver abaixo)
         )
         
+        # Métricas do Treino
         avg_reward = np.mean(metrics['reward_history']) 
         avg_crash_rate = np.mean(metrics['crash_rate_history']) 
         avg_idle_rate = np.mean(metrics['idle_rate_history']) 
         avg_distance = np.mean(metrics['avg_distance_history'])
         
-        # 4. Define a Métrica de Sucesso (Média dos últimos rewards)
-        # Se o histórico for vazio (erro), retorna um valor muito baixo
-        
-        score = 0
+        # 4. Filtro de Qualidade (Fail Fast)
+        # Se o histórico for preguiçoso, retorna um valor muito baixo e aborta
         if avg_distance < 1.0 or avg_idle_rate > 0.5:
             avg_reward = -1000.0
             mlflow.log_metric("fail_reason", 1)
@@ -60,21 +79,24 @@ def objective(trial: optuna.Trial):
             mlflow.log_metric("fail_reason", 0)
         
         
-        
-        
+        # 5. Avaliação (Prova Real)
         eval_reward, action_dict, succes_rate = run_evaluation(
             model_name=trial_name, 
+            latency_steps=latency_steps,
+            stack_size=stack_size,
             episodes=10, # 10 episódios de teste
             headless=True, # Sem janela para ser rápido,
             delay=0.00
         )
         
-        
-        
-        
         # 3. Verifica Viés (Bias Check)
-        total_actions:int = sum(action_dict.values())
-        pct_right: float = 0.0
+        total_actions = sum(action_dict.values())
+        if total_actions > 0:
+            pct_right = action_dict[4] / total_actions
+            pct_left = action_dict[3] / total_actions
+        else:
+            pct_right = 0.0
+            pct_left = 0.0
         
         mlflow.log_metrics({
             "test_act_stop_pct": action_dict[0] / total_actions if total_actions > 0 else 0.0,
@@ -86,35 +108,29 @@ def objective(trial: optuna.Trial):
             "test_avg_reward": eval_reward
         })
         
-        
-        if total_actions > 0:
-            pct_right = action_dict[4] / total_actions
-        else:
-            pct_right = 0.0
-        
-        if pct_right > 0.5:
+        # Penalidade de Viés Extremo
+        if pct_right > 0.8 or pct_left > 0.8: # Um pouco mais tolerante (0.8)
             mlflow.log_metric("bias_penalty", 1)
             return -500.0
         
-        # Supondo Reward máx ~100
+        # Supondo Reward máx ~100 para normalizar
         norm_reward = eval_reward / 100.0 
         
         action_counts = list(action_dict.values())
-        total_actions_eval = sum(action_dict.values())
-        action_std = 0.0
-        if total_actions_eval > 0:
-            action_counts = list(action_dict.values())
-            action_std = np.std(action_counts) / total_actions_eval
+        if total_actions > 0:
+            action_std = np.std(action_counts) / total_actions
         else:
-            action_std = 1.0 # Punição máxima se não fez nada
+            action_std = 1.0 
         
-        # A Fórmula Mágica Simplificada
+        # --- A Fórmula Mágica Simplificada ---
+        # Prioridade total: Chegar no alvo (succes_rate)
+        # Desempate: Distância percorrida (avg_distance)
         score = (
             (1.0 * norm_reward) +       # Performance Geral
-            (2.0 * succes_rate) -       # Ojetivo Final (Peso alto!)
-            (1.0 * avg_idle_rate)
+            (50.0 * succes_rate) +      # Ojetivo Final (Peso alto!)
+            (5.0 * avg_distance) -      # Bônus por andar longe
+            (2.0 * avg_idle_rate)       # Penalidade leve por parar
         )
-        
         
         # Loga a métrica alvo no MLflow
         mlflow.log_metrics({
@@ -125,31 +141,29 @@ def objective(trial: optuna.Trial):
             "action_std": action_std
         })
     
-       
-        
     return score
 
 if __name__ == "__main__":
     # Configura o Experimento no MLflow
-    mlflow.set_experiment("ESP32_Optuna_Tuning")
+    mlflow.set_experiment("ESP32_Latency_Stacking_Tuning")
     
     # Inicia a Run "Pai"
-    with mlflow.start_run(run_name="Optuna_Session_v4.1_Reward_Tuning"):
+    with mlflow.start_run(run_name=f"Optuna_Session_v6_Latency_{SESSION_ID}"):
         git_commit, git_branch = get_git_info()
         mlflow.set_tag("git.commit", git_commit)
         mlflow.set_tag("git.branch", git_branch)
         mlflow.set_tag("user", "Pedro")
+        
         storage_url = "sqlite:///optuna_db.sqlite3"
         
         study = optuna.create_study(
-            study_name="ESP32_Optuna_Tuning",
-            
+            study_name="ESP32_Latency_Stacking",
             storage=storage_url,
             direction="maximize",
-            load_if_exists=True)
+            load_if_exists=True
+        )
         
-        
-        study.optimize(objective, n_trials=15)
+        study.optimize(objective, n_trials=2)
         
         # Loga os melhores parâmetros na Run Pai
         mlflow.log_params(study.best_params)

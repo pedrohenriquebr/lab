@@ -4,7 +4,7 @@ from esp32robot.simulation import Esp322DEnv
 import argparse
 import numpy as np 
 
-def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=True, show_results=False) -> tuple[float, dict[int, int], float]: 
+def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, latency_steps=5, stack_size=4, headless=True, show_results=False) -> tuple[float, dict[int, int], float]: 
     """
     Carrega um modelo treinado e roda visualmente sem treinar.
     """
@@ -15,13 +15,15 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=Tru
         print(f"\n🎬 INICIANDO MODO DE AVALIAÇÃO (VISUAL)")
 
     # 1. Cria o ambiente com renderização HUMAN (Janela PyGame)
-    env = Esp322DEnv(render_mode=mode, env_type='default', latency_steps=5)
+    env = Esp322DEnv(render_mode=mode, env_type='default', latency_steps=latency_steps, stack_size=stack_size)
     
     # 2. Cria o agente (mesma configuração do treino)
     agent = QAgent2D(env.action_space, env.observation_space, use_dqn=True)
     
     # 3. Carrega o Modelo
     model_file_path = str(MODELS_DIR / f"{model_name}.pth")
+    
+    print(f"🔄 Carregando modelo de: {model_file_path}")
 
     if os.path.exists(model_file_path):
         agent.load(model_file_path)
@@ -83,7 +85,7 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=Tru
         env.close()
         
         if headless and not show_results:
-            return np.mean(stats["rewards"]), stats["actions"], stats["success_counts"]/episodes # type: ignore
+            return np.median(stats["rewards"]), stats["actions"], stats["success_counts"]/episodes # type: ignore
     
         print("\n🎬 Modo de Avaliação finalizado.")
         # formatar melhor a visualização com porcentagem
@@ -97,12 +99,14 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=Tru
             print(f"   Ação {action_names[action]}: {count} vezes ({percentage:.2f}%)")
             
         avg_reward = np.mean(stats["rewards"]) # type: ignore
+        median_reward = np.median(stats["rewards"]) # type: ignore
         success_rate = (stats["success_counts"] / episodes) * 100 # type: ignore
         print(f"\n📈 Recompensa Média por Episódio: {avg_reward:.2f}")
+        print(f"📈 Recompensa Mediana por Episódio: {median_reward:.2f}")
         print(f"🏆 Taxa de Sucesso: {success_rate:.2f}% ({stats['success_counts']} de {episodes})")
         
         print("✅ Janela fechada.")
-        return avg_reward, stats["actions"], success_rate/100 # type: ignore
+        return median_reward, stats["actions"], success_rate/100 # type: ignore
             
             
     

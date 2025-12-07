@@ -55,6 +55,15 @@ class QAgent2D:
             self.loss_fn = nn.MSELoss()
             self.memory : list[tuple] = []
             self.batch_size = batch_size
+            
+    def get_arch(self) -> str:
+            # Pega dimensões reais de cada camada
+            in_dim = self.policy_net.fc1.in_features
+            h1_dim = self.policy_net.fc1.out_features
+            h2_dim = self.policy_net.fc2.out_features
+            out_dim = self.policy_net.fc3.out_features
+            
+            return f'DQN_{in_dim}_{h1_dim}_{h2_dim}_{out_dim}'
 
     def _default_discretize_sensors(self, sensors):
         """

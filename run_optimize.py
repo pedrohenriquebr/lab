@@ -7,11 +7,14 @@ import sys
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run parallel optimization")
     parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
+    parser.add_argument("--restore", action="store_true", help="Continue from an existing study")
     args = parser.parse_args()
     
     # 1. Limpa o banco antigo (Começa estudo do zero)
-    # Cuidado: Só faça isso se realmente quiser perder o histórico anterior
-    if os.path.exists("optuna_db.sqlite3"):
+    if args.restore:
+        print("♻️ Continuando de um estudo existente...")
+        
+    if not args.restore and os.path.exists("optuna_db.sqlite3"):
         try:
             os.unlink("optuna_db.sqlite3")
             print("🗑️ Banco de dados antigo removido.")

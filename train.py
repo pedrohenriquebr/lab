@@ -57,6 +57,9 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                 learning_rate=0.0005,
                 epsilon_decay=0.99,
                 headless=False,
+                gamma=0.9,
+                stack_size=6,
+                latency_steps=5,
                 rotation_penalty=0.1):
     
     # Configura experimento
@@ -93,14 +96,14 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
             render_mode = "human" if not headless else None
             
             # Inicialização
-            env = Esp322DEnv(render_mode=render_mode, rotation_penalty=rotation_penalty, latency_steps=5, stack_size=6)
+            env = Esp322DEnv(render_mode=render_mode, rotation_penalty=rotation_penalty, latency_steps=latency_steps, stack_size=stack_size)
             
             # Nota: Certifique-se que seu QAgent2D aceita 'lr' e 'epsilon_decay' no __init__
             # Se não aceitar, definimos manualmente abaixo
             agent = QAgent2D(env.action_space, env.observation_space, 
                              use_dqn=True, 
                              batch_size=batch_size,
-                             gamma=0.5)
+                             gamma=gamma)
             agent.lr = learning_rate          # Força atualização
             agent.optimizer.param_groups[0]['lr'] = learning_rate # Atualiza otimizador
             agent.epsilon_decay = epsilon_decay # Força atualização
@@ -114,7 +117,7 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                 "batch_size": batch_size,
                 "epsilon_decay": epsilon_decay,
                 "learning_rate": learning_rate,
-                "architecture": "DQN_24_64_64_5"
+                "architecture": agent.get_arch()
             })
 
             # Carregar existente?

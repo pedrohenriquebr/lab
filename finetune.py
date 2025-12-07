@@ -5,37 +5,38 @@ import os
 import time
 import numpy as np
 from contextlib import nullcontext
-from datetime import datetime, timedelta
 
 from esp32robot.simulation import Esp322DEnv
 from esp32robot.agents import QAgent2D
 from esp32robot.config import MODELS_DIR, COLAB_MODE
 from IPython.display import clear_output
 
-def run_finetuning(base_model_name, new_model_name, episodes=100, max_steps=300, batch_size=64):
+def run_finetuning(base_model_name, new_model_name, episodes=150, 
+                   stack_size=4, latency_steps=5,
+                   epsilon_start=0.3, epsilon_decay=0.98,
+                   learning_rate=2e-5
+                   ):
     
-    # --- CONFIGURAÇÃO DE FINE-TUNING ---
-    LR_FINETUNE = 0.00010880501821304784
-    EPSILON_START = 0.2    # Pouca exploração (mas suficiente para sair de mínimos locais)
-    EPSILON_DECAY = 0.95   # Cai rápido
-    ENV_TYPE = 'default'      # Mapa difícil para forçar generalização
+    # --- CONFIGURAÇÃO ---
+    # Começa explorando para se adaptar ao lag no novo mapa
+    epsilon_start = 0.3    
+    epsilon_decay = 0.98   
     
-    # Penaliza levemente a DIREITA para corrigir vícios
-    CORRECTION_WEIGHTS = {
-        3:0,  # Left (Bônus leve)
-        4:0   # Right (Multa leve)
-    }
+    # Mapa difícil para provar que ele aprendeu a antecipar
+    ENV_TYPE = 'default'      
+    
+    # Sem pesos manuais, deixa o Stacking resolver
+    CORRECTION_WEIGHTS = {3: 0, 4: 0}
 
-    # Configura MLflow
-    mlflow.set_experiment("ESP32_Fine_Tuning")
     
+    # ... (Lógica de contexto MLflow igual) ...
     active_run = mlflow.active_run()
     if active_run:
         print(f"🔄 Anexando à Run existente: {active_run.info.run_id}")
         run_context = nullcontext()
     else:
+        mlflow.set_experiment("ESP32_Fine_Tuning")
         run_name = f"FT_{new_model_name}_{int(time.time())}"
-        print(f"✨ Criando nova Run: {run_name}")
         run_context = mlflow.start_run(run_name=run_name)
 
     agent = None
@@ -43,116 +44,115 @@ def run_finetuning(base_model_name, new_model_name, episodes=100, max_steps=300,
     
     with run_context:
         try:
-            # 1. Inicializa Ambiente Difícil
-            env = Esp322DEnv(render_mode=None, env_type=ENV_TYPE, rotation_penalty=0, 
-                             action_weights=CORRECTION_WEIGHTS,
-                             )
+            # 1. Inicializa com a MESMA arquitetura do treino
+            env = Esp322DEnv(
+                render_mode=None, 
+                env_type=ENV_TYPE, 
+                rotation_penalty=0.01,
+                action_weights=CORRECTION_WEIGHTS,
+                latency_steps=latency_steps, # Importante manter o lag
+                stack_size=stack_size        # Importante manter a memória
+            )
 
-            # 2. Carrega o Agente
-            agent = QAgent2D(env.action_space, use_dqn=True, batch_size=batch_size)
+            # 2. Carrega Agente (O input_dim é calculado internamente pelo env/agent se configurado, 
+            # ou precisamos passar. Vamos assumir que seu QAgent2D lida com isso ou você ajustou).
+            # Se QAgent2D calcula input_dim = 3 * stack_size, passe o stack_size pra ele se necessário
+            # ou garanta que ele pegue do env.observation_space.shape[0]
             
-            # Carrega os pesos do modelo vencedor (BASE)
+            # (Aqui assumo que QAgent2D pega o tamanho do env.observation_space automaticamente)
+            agent = QAgent2D(env.action_space, env.observation_space, use_dqn=True, batch_size=32)
+            
+            # Carrega Pesos
             base_path = str(MODELS_DIR / f"{base_model_name}.pth")
             if not os.path.exists(base_path):
                 raise FileNotFoundError(f"Modelo base não encontrado: {base_path}")
-                
-            agent.load(base_path)
-            # Copia para a rede alvo também
+            
+            # Tenta carregar. Se o stack_size estiver errado, vai dar erro aqui.
+            try:
+                agent.load(base_path)
+            except RuntimeError as e:
+                print(f"❌ ERRO DE SHAPE: Você tentou carregar um modelo com arquitetura diferente!")
+                print(f"Confira se o 'stack_size' ({stack_size}) é o mesmo do treino original.")
+                raise e
+
             if hasattr(agent, 'target_net'):
                 agent.target_net.load_state_dict(agent.policy_net.state_dict())
 
-            # 3. Ajusta Hiperparâmetros para "Cirurgia"
-            agent.lr = LR_FINETUNE
-            for g in agent.optimizer.param_groups: 
-                g['lr'] = LR_FINETUNE
-            
-            agent.epsilon = EPSILON_START
-            agent.epsilon_decay = EPSILON_DECAY
+            # Configura fine-tuning
+            agent.lr = learning_rate
+            for g in agent.optimizer.param_groups: g['lr'] = learning_rate
+            agent.epsilon = epsilon_start
+            agent.epsilon_decay = epsilon_decay
             
             mlflow.log_params({
                 "base_model": base_model_name,
-                "new_model": new_model_name,
-                "lr_finetune": LR_FINETUNE,
-                "env_type": ENV_TYPE,
-                "correction": "Increase success rate"
+                "stack_size": stack_size,
+                "latency_steps": latency_steps,
+                "env_type": ENV_TYPE
             })
             
-            print(f"🔧 Iniciando Fine-Tuning de '{base_model_name}' no mapa '{ENV_TYPE}'...")
+            print(f"🔧 Fine-Tuning: '{base_model_name}' (Stack={stack_size}, Lag={latency_steps})")
 
-            # 4. Loop de Treino
+            # 3. Loop de Treino (Padrão)
             for ep in range(episodes):
                 obs, _ = env.reset()
                 total_reward = 0
                 episode_losses = []
                 
-                # Métricas extras
-                action_counts = {0:0, 1:0, 2:0, 3:0, 4:0}
-                
-                for step in range(max_steps):
+                # Aumente max_steps no Maze, pois com lag ele demora mais pra manobrar
+                for step in range(400): 
                     action = agent.get_action(obs)
-                    action_counts[action] += 1
-                    
                     next_obs, reward, done, _, info = env.step(action)
                     
-                    # Aplica Correção Manual de Viés (Se não implementou no env, faz aqui)
-                    # Ex: Se virar pra direita, pune extra
-                    if action == 4: reward -= 0.1
-                    
                     loss = agent.update(obs, action, reward, next_obs)
-                    if loss and loss != 0:
-                        episode_losses.append(loss)
+                    if loss and loss != 0: episode_losses.append(loss)
                     
                     obs = next_obs
                     total_reward += reward
                     if done: break
                 
-                # Atualizações de Fim de Episódio
                 if agent.epsilon > agent.min_epsilon:
                     agent.epsilon *= agent.epsilon_decay
                 
                 avg_loss = np.mean(episode_losses) if episode_losses else 0
                 
-                # Logs
                 mlflow.log_metrics({
                     "ft_reward": total_reward,
                     "ft_loss": avg_loss,
                     "epsilon": agent.epsilon
                 }, step=ep)
-                
-                # Log de Ações (Pra ver se parou de ir só pra direita)
-                total_actions = sum(action_counts.values())
-                if total_actions > 0:
-                    mlflow.log_metrics({
-                        "act_left_pct": action_counts[3] / total_actions,
-                        "act_right_pct": action_counts[4] / total_actions
-                    }, step=ep)
 
                 if ep % 5 == 0:
                     if COLAB_MODE: clear_output(wait=True)
-                    print(f"Ep {ep}/{episodes} | R: {total_reward:.1f} | L: {avg_loss:.4f} | Eps: {agent.epsilon:.2f}")
+                    print(f"Ep {ep}/{episodes} | R: {total_reward:.1f} | Eps: {agent.epsilon:.2f}")
 
-            # 5. Salva o Modelo Final
-            save_path = str(MODELS_DIR / f"{new_model_name}.pth")
+            # 4. Salva (use pasta finetuned)
+            FT_DIR = MODELS_DIR / "finetuned"
+            if not FT_DIR.exists(): FT_DIR.mkdir()
+            
+            save_path = str(FT_DIR / f"{new_model_name}.pth")
             agent.save(save_path)
             mlflow.log_artifact(save_path)
             
-            print(f"✅ Modelo refinado salvo: {new_model_name}.pth")
+            print(f"✅ Modelo refinado salvo em: {save_path}")
             
         except KeyboardInterrupt:
             print("\n⛔ Fine-Tuning interrompido!")
-            if agent:
-                save_path = str(MODELS_DIR / f"{new_model_name}_interrupted.pth")
-                agent.save(save_path)
-                print("💾 Modelo parcial salvo.")
-        
         finally:
             if env: env.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base", type=str, required=True, help="Nome do modelo vencedor (sem .pth)")
-    parser.add_argument("--new", type=str, default="production_v1", help="Nome do novo modelo")
-    parser.add_argument("--episodes", type=int, default=100, help="Número de episódios para fine-tuning")
+    parser.add_argument("--base", type=str, required=True, help="Modelo Vencedor do Optuna")
+    parser.add_argument("--new", type=str, default="production_v2_latency", help="Nome do novo modelo")
+    parser.add_argument("--episodes", type=int, default=150)
+    
+    # NOVOS PARAMETROS QUE VOCÊ PRECISA PEGAR DO RESULTADO DO OPTUNA
+    parser.add_argument("--stack", type=int, default=4, help="Stack Size usado no treino")
+    parser.add_argument("--latency", type=int, default=5, help="Latency Steps usado no treino")
+    
     args = parser.parse_args()
 
-    run_finetuning(args.base, args.new, args.episodes)
+    run_finetuning(args.base, args.new, args.episodes, 
+                   stack_size=args.stack, 
+                   latency_steps=args.latency)
