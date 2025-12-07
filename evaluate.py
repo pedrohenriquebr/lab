@@ -15,10 +15,10 @@ def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, headless=Tru
         print(f"\n🎬 INICIANDO MODO DE AVALIAÇÃO (VISUAL)")
 
     # 1. Cria o ambiente com renderização HUMAN (Janela PyGame)
-    env = Esp322DEnv(render_mode=mode, env_type='default')
+    env = Esp322DEnv(render_mode=mode, env_type='default', latency_steps=5)
     
     # 2. Cria o agente (mesma configuração do treino)
-    agent = QAgent2D(env.action_space, use_dqn=True)
+    agent = QAgent2D(env.action_space, env.observation_space, use_dqn=True)
     
     # 3. Carrega o Modelo
     model_file_path = str(MODELS_DIR / f"{model_name}.pth")

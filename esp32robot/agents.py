@@ -5,6 +5,8 @@ import torch.nn as nn
 import numpy as np
 import random
 import torch.optim as optim
+from gymnasium import spaces
+from gymnasium import core
 
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
@@ -22,11 +24,14 @@ class DQN(nn.Module):
 
 
 class QAgent2D:
-    def __init__(self, action_space, use_dqn=False, batch_size=64, 
+    def __init__(self, action_space: spaces.Space[core.ActType],
+                 observation_space: spaces.Space[core.ObsType], 
+                 use_dqn=False, batch_size=64,
+                 gamma=0.9, 
                  learning_rate=0.0005):
-        self.q_table = defaultdict(lambda: np.zeros(action_space.n))
+        self.q_table = defaultdict(lambda: np.zeros(action_space.n)) # type: ignore
         self.lr = learning_rate
-        self.gamma = 0.9
+        self.gamma = gamma
         self.epsilon = 1.0
         self.epsilon_decay = 0.995
         self.min_epsilon = 0.05
@@ -41,9 +46,8 @@ class QAgent2D:
         if self.use_dqn:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
             print(f"Agente DDQN no dispositivo: {self.device}")
-
-            self.policy_net = DQN(3, action_space.n).to(self.device)
-            self.target_net = DQN(3, action_space.n).to(self.device)
+            self.policy_net = DQN(observation_space.shape[0], action_space.n).to(self.device)
+            self.target_net = DQN(observation_space.shape[0], action_space.n).to(self.device)
             self.target_net.load_state_dict(self.policy_net.state_dict())
             self.target_net.eval()
 

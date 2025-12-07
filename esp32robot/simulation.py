@@ -5,6 +5,8 @@ import pygame
 import math
 import random
 
+from pyparsing import deque
+
 ACTIONS_INDEX = {
     'STOP': 0,
     'FORWARD': 1,
@@ -17,7 +19,10 @@ ACTIONS_INDEX = {
 class Esp322DEnv(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, env_type='default', rotation_penalty=0.1, action_weights=None):
+    def __init__(self, render_mode=None, env_type='default', rotation_penalty=0.1, 
+                 action_weights=None, 
+                 latency_steps=0,
+                 stack_size=8):
         self.window_size = 600  # Tamanho da janela (pixels)
         self.map_scale = 100    # 100 pixels = 1 metro (Mundo de 6x6 metros)
         
@@ -30,12 +35,19 @@ class Esp322DEnv(gym.Env):
         self.rotation_penalty = rotation_penalty
         self.action_weights = action_weights if action_weights is not None else {0:0, 1:0, 2:0, 3:0, 4:0}
         self.last_action = 0
+        self.stack_size = stack_size
+        self.num_sensors = 3
+        total_obs = self.num_sensors * self.stack_size
+        self.latency_steps = latency_steps
+        self.action_buffer = deque([0] * (latency_steps+1), maxlen=latency_steps+1)
         
         # Action Space: 0:Stop, 1:Fwd, 2:Back, 3:Left, 4:Right
         self.action_space = spaces.Discrete(5)
         
         # Observation Space: 3 valores flutuantes (Distância Esq, Centro, Dir)
-        self.observation_space = spaces.Box(low=0, high=1, shape=(3,), dtype=np.float32)
+        self.observation_space = spaces.Box(low=0, high=1, shape=(total_obs,), dtype=np.float32)
+        self.obs_stack = deque([np.zeros(self.num_sensors)] * self.stack_size, maxlen=self.stack_size)
+
 
         self.car_radius = 0.15 
         self.car_speed = 0.05
@@ -122,7 +134,14 @@ class Esp322DEnv(gym.Env):
         self.collision_count = 0
         self.last_pos = self.car_pos.copy()
         
+        self.action_buffer.clear()
+        self.action_buffer.extend([0] * (self.latency_steps+1))
+        self.obs_stack.clear()
         self._update_sensors()
+        initial_obs = np.array(self.sensors, dtype=np.float32)
+        for _ in range(self.stack_size):
+            self.obs_stack.append(initial_obs)
+            
         return self._get_obs(), {}
 
     def _create_line_obstacle(self, start, end, radius=0.2):
@@ -138,6 +157,9 @@ class Esp322DEnv(gym.Env):
             self.obstacles.append({'pos': pos, 'radius': radius, 'vel': np.array([0.0,0.0])})
 
     def step(self, action):
+        self.action_buffer.append(action)
+        delayed_action = self.action_buffer[0]
+        
         # --- Atualiza Obstáculos Dinâmicos ---
         if self.env_type == 'dynamic':
             for obs in self.obstacles:
@@ -151,15 +173,15 @@ class Esp322DEnv(gym.Env):
                     obs['vel'][1] *= -1
 
         # --- Física do Carro ---
-        if action == 1: # FWD
+        if delayed_action == 1: # FWD
             self.car_pos[0] += self.car_speed * math.cos(self.car_angle)
             self.car_pos[1] += self.car_speed * math.sin(self.car_angle)
-        elif action == 2: # BACK
+        elif delayed_action == 2: # BACK
             self.car_pos[0] -= self.car_speed * math.cos(self.car_angle)
             self.car_pos[1] -= self.car_speed * math.sin(self.car_angle)
-        elif action == 3: # LEFT
+        elif delayed_action == 3: # LEFT
             self.car_angle -= 0.2
-        elif action == 4: # RIGHT
+        elif delayed_action == 4: # RIGHT
             self.car_angle += 0.2
 
         # --- Detecção de Colisão ---
@@ -178,6 +200,9 @@ class Esp322DEnv(gym.Env):
                 break
 
         self._update_sensors()
+        
+        current_obs = np.array(self.sensors, dtype=np.float32)
+        self.obs_stack.append(current_obs)
         
         # --- Rastreamento ---
         dist_moved = np.linalg.norm(self.car_pos - self.last_pos)
@@ -201,22 +226,22 @@ class Esp322DEnv(gym.Env):
             terminated = True
         else:
             if is_in_corner:
-                if action == 2: reward += 0.5 
+                if delayed_action == 2: reward += 0.5 
                 else: reward -= 0.8 
             elif is_blocked_front:
-                if action == 2: reward += 0.2
-                elif action in [3, 4]: reward += 0.1 
-                elif action == 1: reward -= 1.0
+                if delayed_action == 2: reward += 0.2
+                elif delayed_action in [3, 4]: reward += 0.1 
+                elif delayed_action == 1: reward -= 1.0
                 else: reward -= 0.1
             else:
-                if action == 1: reward += 0.2
-                elif action == 0: reward -= 0.5
-                elif action == 2: reward -= 0.5
+                if delayed_action == 1: reward += 0.2
+                elif delayed_action == 0: reward -= 0.5
+                elif delayed_action == 2: reward -= 0.5
             
-            if (self.last_action == 3 and action == 4) or (self.last_action == 4 and action == 3) or (action == 1 and self.last_action == 2) or (action == 2 and self.last_action == 1):
+            if (self.last_action == 3 and delayed_action == 4) or (self.last_action == 4 and delayed_action == 3) or (delayed_action == 1 and self.last_action == 2) or (delayed_action == 2 and self.last_action == 1):
                 reward -= 0.4 # Punição severa por indecisão!
             self.last_action = action
-            reward += self.action_weights.get(action, 0)
+            reward += self.action_weights.get(delayed_action, 0)
             
             # Penalidade se não sair do lugar (Anti-Trapaça)
             if dist_moved < 0.01:
@@ -241,7 +266,7 @@ class Esp322DEnv(gym.Env):
         return self._get_obs(), reward, terminated, False, info
 
     def _get_obs(self):
-        return np.array(self.sensors, dtype=np.float32)
+        return np.concatenate(self.obs_stack)
 
     def _update_sensors(self):
         angles = [self.car_angle - 0.78, self.car_angle, self.car_angle + 0.78]
@@ -278,10 +303,10 @@ class Esp322DEnv(gym.Env):
     def render(self):
         if self.window is None:
             pygame.init()
-            self.window = pygame.display.set_mode((self.window_size, self.window_size))
+            self.window = pygame.display.set_mode((self.window_size+200, self.window_size))
             self.clock = pygame.time.Clock()
 
-        canvas = pygame.Surface((self.window_size, self.window_size))
+        canvas = pygame.Surface((self.window_size+600, self.window_size))
         canvas.fill((255, 255, 255))
         
         # Desenha Obstáculos
@@ -314,6 +339,61 @@ class Esp322DEnv(gym.Env):
             
             color = (255, 0, 0) if dist_norm < 0.2 else (0, 255, 0)
             pygame.draw.line(canvas, color, car_px, end_px, 2)
+            
+            
+        # Área lateral direita (600 a 800)
+        debug_x = 610
+        debug_y = 50
+        cell_w = 50
+        cell_h = 30
+        
+        # Desenha título
+        font = pygame.font.SysFont(None, 24)
+        img = font.render("Sensor Stack (T0..T-3)", True, (0,0,0))
+        canvas.blit(img, (debug_x, 10))
+        
+        # Desenha matriz
+        # Stack é uma deque. O último elemento é o mais recente.
+        # Vamos desenhar de cima pra baixo: T (recente) -> T-3 (antigo)
+        stack_list = list(self.obs_stack)
+        stack_list.reverse() # Mais recente em cima
+        
+        sensor_names = ["E", "C", "D"]
+        
+        for row_idx, sensors in enumerate(stack_list):
+            for col_idx, val in enumerate(sensors): # val: 0.0 (perto) a 1.0 (longe)
+                x = debug_x + col_idx * cell_w
+                y = debug_y + row_idx * cell_h
+                
+                # Cor baseada no valor (Vermelho=Perto, Verde=Longe)
+                # 0.0 -> (255, 0, 0)
+                # 1.0 -> (0, 255, 0)
+                r = int((1.0 - val) * 255)
+                g = int(val * 255)
+                color = (r, g, 0)
+                
+                pygame.draw.rect(canvas, color, (x, y, cell_w-2, cell_h-2))
+                
+                # Valor texto
+                txt = font.render(f"{val:.1f}", True, (0,0,0))
+                canvas.blit(txt, (x+10, y+5))
+                
+                if row_idx == 0: # Cabeçalho
+                    head = font.render(sensor_names[col_idx], True, (0,0,0))
+                    canvas.blit(head, (x+15, debug_y - 20))
+
+        # Desenha Ação Atrasada (Buffer)
+        buffer_y = debug_y + 300
+        img = font.render(f"Action Delay ({self.latency_steps} steps):", True, (0,0,0))
+        canvas.blit(img, (debug_x, buffer_y))
+        
+        buffer_list = list(self.action_buffer)
+        for i, act in enumerate(buffer_list):
+            # Desenha fila
+            pygame.draw.rect(canvas, (200, 200, 200), (debug_x + i*20, buffer_y + 30, 18, 18))
+            txt = font.render(str(act), True, (0,0,0))
+            canvas.blit(txt, (debug_x + i*20 + 5, buffer_y + 32))
+
 
         self.window.blit(canvas, (0, 0))
         pygame.event.pump()

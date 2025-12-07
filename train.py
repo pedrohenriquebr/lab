@@ -55,7 +55,7 @@ class TrainingTimer:
 
 def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=32, display_every=5, 
                 learning_rate=0.0005,
-                epsilon_decay=0.98,
+                epsilon_decay=0.99,
                 headless=False,
                 rotation_penalty=0.1):
     
@@ -93,11 +93,14 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
             render_mode = "human" if not headless else None
             
             # Inicialização
-            env = Esp322DEnv(render_mode=render_mode, rotation_penalty=rotation_penalty)
+            env = Esp322DEnv(render_mode=render_mode, rotation_penalty=rotation_penalty, latency_steps=5, stack_size=6)
             
             # Nota: Certifique-se que seu QAgent2D aceita 'lr' e 'epsilon_decay' no __init__
             # Se não aceitar, definimos manualmente abaixo
-            agent = QAgent2D(env.action_space, use_dqn=True, batch_size=batch_size)
+            agent = QAgent2D(env.action_space, env.observation_space, 
+                             use_dqn=True, 
+                             batch_size=batch_size,
+                             gamma=0.5)
             agent.lr = learning_rate          # Força atualização
             agent.optimizer.param_groups[0]['lr'] = learning_rate # Atualiza otimizador
             agent.epsilon_decay = epsilon_decay # Força atualização
@@ -111,7 +114,7 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                 "batch_size": batch_size,
                 "epsilon_decay": epsilon_decay,
                 "learning_rate": learning_rate,
-                "architecture": "DQN_3_64_64_5"
+                "architecture": "DQN_24_64_64_5"
             })
 
             # Carregar existente?
@@ -143,7 +146,8 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                     action = agent.get_action(obs)
                     next_obs, reward, done, _, info = env.step(action)
                     action_counts[action] += 1
-                    # time.sleep(0.01) # Pequeno delay para visualização se necessário
+                    # if not headless:
+                    #     time.sleep(5)  # Pequeno delay para visualização
                     
                     loss = agent.update(obs, action, reward, next_obs)
                     if loss and loss != 0:
@@ -244,6 +248,7 @@ if __name__ == "__main__":
     parser.add_argument("--episodes", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--max_steps", type=int, default=200)
+    parser.add_argument("--headless", action='store_true', help="Executar sem renderização")
     args = parser.parse_args()
 
     # Monta o caminho completo
@@ -256,6 +261,7 @@ if __name__ == "__main__":
         episodes=args.episodes,
         max_steps=args.max_steps,
         batch_size=args.batch_size,
+        headless=args.headless,
         display_every=1
     )
 
