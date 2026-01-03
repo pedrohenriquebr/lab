@@ -24,7 +24,7 @@ REPORTS_DIR = PROJ_ROOT / "reports"
 FIGURES_DIR = REPORTS_DIR / "figures"
 COLAB_MODE = False  # 🔴 IMPORTANTE: True para Colab, False para PC local
 # Configuração do Robô (AJUSTE SEU IP)
-ROBOT_IP = "192.168.1.11"  # 🔴 ALTERE para o IP do seu ESP32
+ROBOT_IP = "192.168.1.14"  # 🔴 ALTERE para o IP do seu ESP32
 COMMANDS = {
     0: f"http://{ROBOT_IP}/stop",
     1: f"http://{ROBOT_IP}/go",
@@ -37,7 +37,7 @@ DELAY = 0.5  # Segundos entre ações (ajuste conforme necessário)
 
 
 # --- CONFIGURAÇÃO DO ROBÔ ---
-ROBOT_IP = "192.168.1.11"
+ROBOT_IP = "192.168.1.14"
 TIMEOUT = 2
 
 # URLs Originais do ESP32

@@ -4,7 +4,7 @@ from esp32robot.simulation import Esp322DEnv
 import argparse
 import numpy as np 
 
-def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, latency_steps=5, stack_size=4, headless=True, show_results=False) -> tuple[float, dict[int, int], float]: 
+def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, latency_steps=5, stack_size=8, headless=True, show_results=False) -> tuple[float, dict[int, int], float]: 
     """
     Carrega um modelo treinado e roda visualmente sem treinar.
     """

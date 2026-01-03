@@ -1,130 +1,90 @@
-import statistics
-import cv2
-import time
 import argparse
+import time
+import cv2
+from esp32robot.config import COMMANDS, STREAM_URL, MODELS_DIR, ROBOT_IP
+from esp32robot.controller import DeployedAgent, RealRobotController, history_executions
+import numpy as np
+import pandas as pd
 
-# ==========================================
-# 4. LOOP PRINCIPAL DE OPERAÇÃO
-# ==========================================
-from esp32robot.config import COMMANDS, DELAY, MODEL_PATH, MODELS_DIR, ROBOT_IP, STREAM_URL
-from esp32robot.controller import DeployedAgent, RealRobotController
-
-history_executions: dict[str, list[float]] = {}
-def run_real_robot(model_name='q_table_pc', epsilon=0.05, max_steps=100):
-    """
-    Executa o agente treinado no robô real
-    
-    Args:
-        model_path: Caminho para o modelo treinado (sem .pth)
-        epsilon: Taxa de exploração (0 = 100% greedy)
-        max_steps: Número máximo de ações antes de parar
-    """
+def run_real_robot(model_name, epsilon=0.0, max_steps=200):
     print("="*60)
     print("🤖 INICIANDO AGENTE NO ROBÔ REAL")
     print(f"IP: {ROBOT_IP}")
-    print(f"Modelo: {model_name}.pth")
-    print(f"Exploração: {epsilon*100}%")
+    print(f"Modelo: {model_name}")
     print("="*60)
-    global history_executions
-    history_executions.clear()  # <--- ADICIONE ISSO
-    model_file_path = str(MODELS_DIR / f"{model_name}.pth")
-
-    # Inicializa agente e controller
-    agent = DeployedAgent(model_file_path, epsilon=epsilon, is_2d_model=True)
+    
+    # Path do Modelo
+    # Se for um modelo base, está em models/
+    # Se for fine-tuned, pode estar em models/finetuned/
+    # Vamos tentar achar
+    path_base = MODELS_DIR / f"{model_name}.pth"
+    path_ft = MODELS_DIR / "finetuned" / f"{model_name}.pth"
+    
+    final_path = str(path_ft) if path_ft.exists() else str(path_base)
+    
+    agent = DeployedAgent(final_path, epsilon=epsilon, is_2d_model=True)
     controller = RealRobotController(COMMANDS, STREAM_URL)
+    data_log = []
     
-    
-    # Inicializa janela de debug
-    # Inicializa janela com thread otimizada para Jupyter
+    # Janela
     cv2.namedWindow('ESP32-CAM Debug', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('ESP32-CAM Debug', 1400, 720) 
-
-    cv2.startWindowThread()  # 🔴 OTIMIZA PERFORMANCE NO JUPYTER
+    cv2.resizeWindow('ESP32-CAM Debug', 1200, 600)
     
-    step_count = 0
-    last_non_stop_command = time.time()
-    
+    step = 0
     try:
-        while step_count < max_steps:
-            print(f"\n📷 Step {step_count + 1}/{max_steps}")
-            
-            # 1. Captura frame
+        while step < max_steps:
             frame = controller.get_frame()
-            if frame is None:
-                print("❌ Frame inválido, tentando novamente...")
-                time.sleep(0.5)
+            if frame is None: 
+                print("⚠️ Frame não recebido, tentando novamente...")
                 continue
-            # pil_image = frame.rotate(180)
             
-            # 2. Processa e toma decisão
-            state, debug_img = agent.process_frame(frame)
-            action = agent.get_action(state)
+            # IA
+            state, debug_img, current_sensors = agent.process_frame(frame)
+            action, q_values = agent.get_action(state, return_q_values=True)
+            data_log.append({
+                "step": step,
+                "sensors_state": current_sensors,
+                "stacked_state": state,
+                "q_values": q_values,
+                "action": action,
+                "timestamp": time.time()
+            })
             
-            if action !=0:
-                last_non_stop_command  = time.time()
-            
+            # Display
             cv2.imshow('ESP32-CAM Debug', debug_img)
-
             
-            # 4. Executa ação no robô
-            success = controller.send_command(action)
-            if not success:
-                print("⛔ Falha crítica. Parando!")
-                break
+            # Comando
+            act_name = ["STOP", "FWD", "BACK", "LEFT", "RIGHT"][action]
+            print(f"Step {step} | Action: {act_name}")
             
-            # 5. Log
-            action_names = ["STOP", "FWD", "BWD", "LEFT", "RGHT"]
-            print(f"🎬 Ação: {action_names[action]}")
-            print(f"📊 State: {state} | Target Cells: {state.count(4)}")
-            
-            if action == 0:
-                print(f'o modelo parou por conta própria após {(time.time() - last_non_stop_command)}s')
-            
-            time.sleep(1)
-            controller.send_command(0)
-            if action != 0:
-                print(f'Foi necessário parar programaticamente após {time.time() - last_non_stop_command}s')
+            controller.send_command(action)
+            time.sleep(0.1) # Pequeno delay
+            controller.send_command(0) # Stop (Modo pulsado para controle fino)
             
             if cv2.waitKey(1) & 0xFF == ord('q'):
-                print("⛔ Parada manual!")
-                controller.send_command(0)  # Envia STOP
                 break
-            
-            step_count += 1
-            time.sleep(DELAY)
+            step += 1
             
     except KeyboardInterrupt:
-        print("\n⛔ Interrompido pelo usuário!")
+        print("\nParando...")
+
     finally:
-        # Para o robô e fecha
-        print("\n🛑 Parando robô...")
         controller.send_command(0)
         cv2.destroyAllWindows()
-        print("✅ Operação finalizada!")
+        for func_name, times in history_executions.items():
+            median_time = np.median(times)
+            print(f"[TIME STATS] {func_name}: {median_time * 1000:.1f} ms (median over {len(times)} calls)")
+            
+        import json
+        df = pd.DataFrame(data_log)
         
-                
-        for key,value in history_executions.items():
-            print(f"Estatísticas para função '{key}':")
-            print('\tTempo médio: ', statistics.mean(value) * 1000, 'ms')
-            print('\tMenor Tempo: ', min(value) * 1000, 'ms')
-            print('\tMaior Tempo: ', max(value) * 1000, 'ms')
-            print('\tMediana : ', statistics.median(value) * 1000, 'ms')
-            print('='*80)
-            print()
-
-# ==========================================
-# 5. EXECUTAR! (DESCOMENTE PARA USAR)
-# ==========================================
-# 🔴 MODO EXPLORAÇÃO: 5% aleatório, 95% política aprendida
-# run_real_robot(model_path=MODEL_PATH, epsilon=0.05, max_steps=100)
-
-# 🔴 MODO EXPLOTAÇÃO: 100% política aprendida (não explora)
+        df.to_pickle("robot_data_log.pkl")
+        print("📊 Dados salvos em robot_data_log.pkl")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--name", type=str, default="model_default", help="Nome do experimento/modelo")
-    parser.add_argument("--steps", type=int, default=50)
+    parser.add_argument("--name", type=str, required=True, help="Nome do arquivo do modelo (sem .pth)")
+    parser.add_argument("--steps", type=int, default=1000)
     args = parser.parse_args()
     
-    print(f"🧪 Iniciando Experimento: {args.name}")
-    run_real_robot(model_name=args.name, epsilon=0.0, max_steps=args.steps)
+    run_real_robot(args.name, max_steps=args.steps)

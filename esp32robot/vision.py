@@ -94,7 +94,7 @@ class VisionProcessor:
             # Isso ajuda a eliminar o "ruído de fundo" da iluminação.
             
             # Limiar de corte: Abaixo de 60 de brilho, considere 0 (Escuro/Longe)
-            if intensity < 50:
+            if intensity < 60:
                 intensity = 0
             
             # Normaliza (0 a 1)

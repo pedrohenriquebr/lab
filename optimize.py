@@ -34,7 +34,7 @@ def objective(trial: optuna.Trial):
     ROTATION_PENALTY = 0.01 
     
     # Nome do Trial
-    trial_name = f"opt_v5_latency_{SESSION_ID}_trial_{trial.number:03d}"
+    trial_name = f"opt_v6_128_64_{SESSION_ID}_trial_{trial.number:03d}"
     
     print(f"\n🔄 Iniciando Trial {trial.number}: LR={lr:.5f}, Gamma={gamma:.3f}, Batch={batch_size}")
 
@@ -144,11 +144,16 @@ def objective(trial: optuna.Trial):
     return score
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Optuna Optimization for ESP32 Robot Agent")
+    parser.add_argument("--trials", type=int, default=20, help="Number of trials to run")
+    args = parser.parse_args()
+    
     # Configura o Experimento no MLflow
-    mlflow.set_experiment("ESP32_Latency_Stacking_Tuning")
+    mlflow.set_experiment("ESP32_Latency_Stacking_Arch_128_64_5_Tuning")
     
     # Inicia a Run "Pai"
-    with mlflow.start_run(run_name=f"Optuna_Session_v6_Latency_{SESSION_ID}"):
+    with mlflow.start_run(run_name=f"Optuna_Session_v6_Arch_128_64_5_{SESSION_ID}"):
         git_commit, git_branch = get_git_info()
         mlflow.set_tag("git.commit", git_commit)
         mlflow.set_tag("git.branch", git_branch)
@@ -157,13 +162,13 @@ if __name__ == "__main__":
         storage_url = "sqlite:///optuna_db.sqlite3"
         
         study = optuna.create_study(
-            study_name="ESP32_Latency_Stacking",
+            study_name="ESP32_Latency_Stacking_Arch_128_64_5",
             storage=storage_url,
             direction="maximize",
             load_if_exists=True
         )
         
-        study.optimize(objective, n_trials=2)
+        study.optimize(objective, n_trials=args.trials)
         
         # Loga os melhores parâmetros na Run Pai
         mlflow.log_params(study.best_params)

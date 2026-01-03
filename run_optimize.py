@@ -8,6 +8,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run parallel optimization")
     parser.add_argument("--workers", type=int, default=4, help="Number of parallel workers")
     parser.add_argument("--restore", action="store_true", help="Continue from an existing study")
+    parser.add_argument('--trials', type=int, default=20, help="Number of trials per worker")
     args = parser.parse_args()
     
     # 1. Limpa o banco antigo (Começa estudo do zero)
@@ -30,7 +31,7 @@ if __name__ == "__main__":
         print(f"   └─ Iniciando Worker {i+1}...")
         # Popen não bloqueia o script, ele lança e continua
         # Usamos sys.executable para garantir que usa o mesmo Python do venv
-        p = subprocess.Popen([sys.executable, "optimize.py"])
+        p = subprocess.Popen([sys.executable, "optimize.py", "--trials", str(args.trials)])
         processes.append(p)
         
         # Pequeno delay para evitar conflito de criação do banco no milissegundo inicial
