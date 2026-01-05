@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 import pickle
 import torch
 import torch.nn as nn
@@ -7,12 +8,82 @@ import random
 import torch.optim as optim
 from gymnasium import spaces
 from gymnasium import core
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class DiscreteWorldModel(nn.Module):
+    def __init__(self, input_dim=12, n_actions=5, n_categorias=32, hidden_size=64):
+        super().__init__()
+        self.n_categorias = n_categorias
+        self.n_actions = n_actions
+        # Mesma arquitetura do seu treino (BatchNorm + 64 cats)
+        self.encoder = nn.Sequential(
+            nn.Linear(input_dim, hidden_size),
+            nn.BatchNorm1d(hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.BatchNorm1d(hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, n_categorias)
+        )
+        # O resto (Decoder/Predictor) não precisamos carregar na RAM do agente 
+        # para economizar, mas a classe precisa ter a estrutura pra carregar os pesos
+        self.decoder = nn.Sequential(
+            nn.Linear(n_categorias, hidden_size), nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
+            nn.Linear(hidden_size, input_dim)
+        )
+        self.predictor = nn.Sequential(
+            nn.Linear(n_categorias + n_actions, hidden_size), nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size), nn.ReLU(),
+            nn.Linear(hidden_size, n_categorias)
+        )
+
+    def forward(self, x, action=None, hard=False):
+        # 1. ENCODER: Gera logits e usa Gumbel-Softmax para discretizar
+        logits = self.encoder(x)
+        # hard=True retorna one-hot (ex: [0, 1, 0]) mas permite gradiente passar
+        z_dist = F.gumbel_softmax(logits, tau=1.0, hard=hard, dim=1)
+
+        # 2. DECODER: Tenta reconstruir a entrada original
+        reconstrucao = self.decoder(z_dist)
+
+        # 3. PREDICTOR: Se tivermos ação, tenta prever o futuro
+        z_future_logits = None
+        if action is not None:
+            # One-hot da ação
+            action_onehot = F.one_hot(action.long(), num_classes=self.n_actions).float()
+            
+            # Concatena estado latente atual + ação
+            pred_input = torch.cat([z_dist, action_onehot], dim=1)
+            z_future_logits = self.predictor(pred_input)
+
+        return reconstrucao, z_dist, z_future_logits, logits
+
+    def get_latent_index(self, x):
+        """Método utilitário para saber qual 'Número' o modelo escolheu"""
+        logits = self.encoder(x)
+        return torch.argmax(logits, dim=1)
+
+    def get_category_probs(self, x):
+        """Retorna as probabilidades (Softmax) ou One-Hot"""
+        self.eval()
+        with torch.no_grad():
+            logits = self.encoder(x)
+            # Retorna probabilidades reais (útil para o DQN)
+            return F.softmax(logits, dim=1)
+
+    def get_category_index(self, x):
+        """Retorna apenas o ID (útil para Q-Table ou Debug)"""
+        probs = self.get_category_probs(x)
+        return torch.argmax(probs, dim=1).item()
 
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(DQN, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 128)
-        self.fc2 = nn.Linear(128, 64)
+        self.fc1 = nn.Linear(input_dim, 64)
+        self.fc2 = nn.Linear(64, 64)
         self.fc3 = nn.Linear(64, output_dim)
         self.relu = nn.ReLU()
 
@@ -25,45 +96,86 @@ class DQN(nn.Module):
 
 class QAgent2D:
     def __init__(self, action_space: spaces.Space[core.ActType],
-                 observation_space: spaces.Space[core.ObsType], 
-                 use_dqn=False, batch_size=64,
-                 gamma=0.9, 
-                 learning_rate=0.0005):
-        self.q_table = defaultdict(lambda: np.zeros(action_space.n)) # type: ignore
-        self.lr = learning_rate
-        self.gamma = gamma
-        self.epsilon = 1.0
-        self.epsilon_decay = 0.995
-        self.min_epsilon = 0.05
-        self.action_space = action_space
-        self.loss_history: list[float] = []
-        self.reward_history: list[float] = []
-        self.target_update_freq = 100
-        self.step_count = 0
-        self.use_dqn = use_dqn
-        self.previous_fig_and_ax = None
-        
-        if self.use_dqn:
+                    observation_space: spaces.Space[core.ObsType], 
+                    use_dqn=False, batch_size=64,
+                    gamma=0.9, 
+                    learning_rate=0.0005,
+                    world_model_path="mini_world_model.pth",
+                    epsilon_start=1.0,
+                    min_epsilon=0.05,
+                    epsilon_decay=0.995,
+                    target_update_freq=100,
+                    memory_size=5000,
+                    world_model_n_categories=32,
+                    world_model_hidden_size=64,
+                    debug=True): # <--- CAMINHO DO MODELO
+            
+            self.q_table = defaultdict(lambda: np.zeros(action_space.n)) 
+            self.lr = learning_rate
+            self.gamma = gamma
+            self.epsilon = epsilon_start
+            self.epsilon_decay = epsilon_decay
+            self.min_epsilon = min_epsilon
+            self.action_space = action_space
+            self.loss_history: list[float] = []
+            self.reward_history: list[float] = []
+            self.target_update_freq = target_update_freq
+            self.step_count = 0
+            self.use_dqn = use_dqn
+            self.previous_fig_and_ax = None
+            self.memory_size = memory_size
+            
+            # --- CARREGAR WORLD MODEL ---
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            print(f"Agente DDQN no dispositivo: {self.device}")
-            self.policy_net = DQN(observation_space.shape[0], action_space.n).to(self.device)
-            self.target_net = DQN(observation_space.shape[0], action_space.n).to(self.device)
-            self.target_net.load_state_dict(self.policy_net.state_dict())
-            self.target_net.eval()
+            
+            # Instancia o World Model (64 categorias)
+            if debug:
+                print("🧠 Inicializando World Model...")
+                print(f"   Dispositivo: {self.device}")
+                print(f"   Espaço de Ação: {action_space}")
+                print(f"   Espaço de Observação: {observation_space}")
+                
+            self.wm = DiscreteWorldModel(input_dim=observation_space.shape[0], 
+                                        n_categorias=world_model_n_categories,
+                                        hidden_size=world_model_hidden_size).to(self.device)
+            
+            self.n_categorias = world_model_n_categories
+            
+            if os.path.exists(world_model_path):
+                print(f"🧠 Carregando World Model de: {world_model_path}")
+                # Carrega pesos (ignore erros de keys faltantes se o decoder não bater exato, 
+                # mas idealmente deve bater a arquitetura)
+                try:
+                    self.wm.load_state_dict(torch.load(world_model_path, map_location=self.device))
+                except:
+                    print("⚠️ Aviso: Pesos carregados com 'strict=False' (Pode ser normal se mudou algo)")
+                    self.wm.load_state_dict(torch.load(world_model_path, map_location=self.device), strict=False)
+                self.wm.eval() # O WM não treina mais, ele só "enxerga"
+            else:
+                print(f"❌ ERRO CRÍTICO: World Model não encontrado em {world_model_path}!")
+                print("O agente vai rodar cego (aleatório) se não arrumar isso.")
 
-            self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.lr)
-            self.loss_fn = nn.MSELoss()
-            self.memory : list[tuple] = []
-            self.batch_size = batch_size
-            
+            # --- CONFIGURA O DQN PARA O NOVO ESPAÇO ---
+            if self.use_dqn:
+                print(f"🤖 Agente DDQN no dispositivo: {self.device}")
+                # O input do DQN agora é o tamanho do One-Hot Vector (64)
+                dqn_input_dim = self.n_categorias 
+                
+                self.policy_net = DQN(dqn_input_dim, action_space.n).to(self.device)
+                self.target_net = DQN(dqn_input_dim, action_space.n).to(self.device)
+                self.target_net.load_state_dict(self.policy_net.state_dict())
+                self.target_net.eval()
+
+                self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.lr)
+                self.loss_fn = nn.MSELoss()
+                self.memory : list[tuple] = []
+                self.batch_size = batch_size
+                self.optimizer.param_groups[0]['lr'] = learning_rate # Atualiza otimizador
+                
     def get_arch(self) -> str:
-            # Pega dimensões reais de cada camada
-            in_dim = self.policy_net.fc1.in_features
-            h1_dim = self.policy_net.fc1.out_features
-            h2_dim = self.policy_net.fc2.out_features
-            out_dim = self.policy_net.fc3.out_features
-            
-            return f'DQN_{in_dim}_{h1_dim}_{h2_dim}_{out_dim}'
+                in_dim = self.policy_net.fc1.in_features
+                h1_dim = self.policy_net.fc1.out_features
+                return f'DQN_WM_{in_dim}_{h1_dim}'
 
     def _default_discretize_sensors(self, sensors):
         """
@@ -91,54 +203,81 @@ class QAgent2D:
             state.append(val)
             
         return tuple(state)
+        
+    def discretize_sensors(self, sensors):
+            """
+            A MÁGICA: Converte sensores (12 floats) -> Conceito (One-Hot ou Int)
+            """
+            # Converte para Tensor
+            sensors_t = torch.tensor(sensors, dtype=torch.float32).unsqueeze(0).to(self.device)
+            
+            # Roda o Encoder
+            probs = self.wm.get_category_probs(sensors_t) # Shape [1, 64]
+            
+            if self.use_dqn:
+                # Para DQN, retornamos o vetor de probabilidades (Soft State) ou One-Hot
+                # Isso dá mais informação pro DQN do que apenas um inteiro.
+                return probs.cpu().numpy()[0] # Retorna array numpy (64,)
+            else:
+                # Para Q-Table, precisamos de um Inteiro (Hashable)
+                idx = torch.argmax(probs).item()
+                return int(idx)
     
     def _discretize_sensors_dqn(self, sensors: np.ndarray):
         return tuple(sensors)
     
-    def discretize_sensors(self, sensors):
-        if not self.use_dqn:
-            return self._default_discretize_sensors(sensors)
-        return self._discretize_sensors_dqn(sensors)
+    # def discretize_sensors(self, sensors):
+    #     if not self.use_dqn:
+    #         return self._default_discretize_sensors(sensors)
+    #     return self._discretize_sensors_dqn(sensors)
 
     def get_action(self, sensors):
-        state = self.discretize_sensors(sensors)
-        
-        if np.random.random() < self.epsilon:
-            return self.action_space.sample()
-        
-        if self.use_dqn:
-            state_tensor = torch.tensor([state], dtype=torch.float32).to(self.device)
-            with torch.no_grad():
-                current_q_values = self.policy_net(state_tensor).cpu().numpy()[0]
-            selected_action = int(np.argmax(current_q_values))
-        else:
-            current_q_values = self.q_table[state]
-            selected_action = int(np.argmax(current_q_values))
+            # Transforma a visão em conceito
+            state = self.discretize_sensors(sensors) # Pode ser Int ou Array(64,)
+            
+            if np.random.random() < self.epsilon:
+                return self.action_space.sample()
+            
+            if self.use_dqn:
+                # O state já é um vetor (64,). Transformar em tensor batch (1, 64)
+                state_tensor = torch.tensor([state], dtype=torch.float32).to(self.device)
+                with torch.no_grad():
+                    current_q_values = self.policy_net(state_tensor).cpu().numpy()[0]
+                selected_action = int(np.argmax(current_q_values))
+            else:
+                # Q-Table usa o inteiro como chave
+                current_q_values = self.q_table[state]
+                selected_action = int(np.argmax(current_q_values))
 
-        return selected_action
+            return selected_action
 
     def update(self, sensors, action, reward, next_sensors):
+        # Converte sensores brutos -> Conceitos Latentes
         state = self.discretize_sensors(sensors)
         next_state = self.discretize_sensors(next_sensors)
         
         if not self.use_dqn:
+            # Lógica Q-Table (Estado é Int)
             best_next = np.max(self.q_table[next_state])
             current_q = self.q_table[state][action]
             new_q = current_q + self.lr * (reward + self.gamma * best_next - current_q)
             self.q_table[state][action] = new_q
         else:
+            # Lógica DQN (Estado é Array 64,)
             self.memory.append((state, action, reward, next_state))
-            if len(self.memory) > 2000:
+            if len(self.memory) > self.memory_size:
                 self.memory.pop(0)
 
             if len(self.memory) < self.batch_size:
                 return 0
 
             batch = random.sample(self.memory, self.batch_size)
-            states_b = torch.tensor([x[0] for x in batch], dtype=torch.float32).to(self.device)
+            
+            # Aqui state já é o vetor one-hot/probs, então empilhamos direto
+            states_b = torch.tensor(np.array([x[0] for x in batch]), dtype=torch.float32).to(self.device)
             actions_b = torch.tensor([[x[1]] for x in batch], dtype=torch.long).to(self.device)
             rewards_b = torch.tensor([x[2] for x in batch], dtype=torch.float32).to(self.device)
-            next_states_b = torch.tensor([x[3] for x in batch], dtype=torch.float32).to(self.device)
+            next_states_b = torch.tensor(np.array([x[3] for x in batch]), dtype=torch.float32).to(self.device)
 
             with torch.no_grad():
                 next_actions = self.policy_net(next_states_b).max(1)[1].unsqueeze(1)
@@ -162,7 +301,6 @@ class QAgent2D:
             return loss.item()
 
         return 0
-    
     
     def plot_training_results(self):
         if not self.use_dqn or not self.loss_history:

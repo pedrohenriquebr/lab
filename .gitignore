@@ -201,3 +201,7 @@ artifacts/
 # Se você usar banco de dados local SQLite para o MLflow (opcional)
 mlflow.db
 *.png
+*.pth
+*.pkl
+*.joblib
+*.sqlite3

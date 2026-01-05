@@ -12,7 +12,7 @@ from esp32robot.simulation import Esp322DEnv
 from esp32robot.agents import QAgent2D
 from IPython.display import clear_output
 
-from esp32robot.utils import get_git_info
+from esp32robot.utils import get_git_info, load_config
 
 class TrainingTimer:
     def __init__(self, total_episodes, display_every=10):
@@ -51,6 +51,12 @@ class TrainingTimer:
         finish = datetime.now() + timedelta(seconds=est)
         return f"⏱️ ETA: {time_str} (~{finish.strftime('%H:%M')}) | Ep {current_episode+1}/{self.total_episodes}"
 
+class TrainingArguments:
+    def __init__(self, environment_config: dict, agent_config: dict, world_model_config: dict, training_config: dict):
+        self.environment_config = environment_config
+        self.agent_config = agent_config
+        self.world_model_config = world_model_config
+        self.training_config = training_config
 
 
 def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=32, display_every=5, 
@@ -58,9 +64,27 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
                 epsilon_decay=0.99,
                 headless=False,
                 gamma=0.9,
-                stack_size=6,
+                stack_size=4,
                 latency_steps=5,
-                rotation_penalty=0.1):
+                rotation_penalty=0.1,
+                experiment_name:str = 'ESP32_Robot_Navigation_2D',
+                env_type:str = 'maze' ,
+                use_dqn:bool = True,
+                epsilon_start: float = 1.0,
+                min_epsilon: float = 0.05,
+                debug: bool = False,
+                output_dir: str  = '',
+                memory_size: int = 10000,
+                target_update_freq: int = 100,
+                threshold_blocked_front:float=0,
+                threshold_corner:float=0,
+                threshold_proximity_danger:float=0,
+                threshold_idle_movement:float=0,
+                rewards=None,
+                world_model_path: str = 'mini_world_model',
+                world_model_n_categories: int = 32,
+                world_model_hidden_size: int = 64,
+                ):
     
     # Configura experimento
     
@@ -72,7 +96,7 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
         print(f"🔄 Anexando à Run existente: {active_run.info.run_id}")
         run_context = nullcontext()
     else:
-        mlflow.set_experiment("ESP32_Robot_Navigation_2D")
+        mlflow.set_experiment(experiment_name)
         run_name = f"{model_name}_{int(time.time())}"
         print(f"✨ Criando nova Run: {run_name}")
         run_context = mlflow.start_run(run_name=run_name)
@@ -96,19 +120,39 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
             render_mode = "human" if not headless else None
             
             # Inicialização
-            env = Esp322DEnv(render_mode=render_mode, rotation_penalty=rotation_penalty, latency_steps=latency_steps, stack_size=stack_size)
-            
+            env = Esp322DEnv(render_mode=render_mode, env_type=env_type, 
+                             rotation_penalty=rotation_penalty, 
+                             latency_steps=latency_steps, 
+                             stack_size=stack_size,
+                             threshold_blocked_front=threshold_blocked_front,
+                             threshold_corner=threshold_corner,
+                             threshold_proximity_danger=threshold_proximity_danger,
+                             threshold_idle_movement=threshold_idle_movement,
+                             rewards=rewards
+                             )
+
             # Nota: Certifique-se que seu QAgent2D aceita 'lr' e 'epsilon_decay' no __init__
             # Se não aceitar, definimos manualmente abaixo
             agent = QAgent2D(env.action_space, env.observation_space, 
-                             use_dqn=True, 
+                             use_dqn=use_dqn, 
                              batch_size=batch_size,
-                             gamma=gamma)
-            agent.lr = learning_rate          # Força atualização
-            agent.optimizer.param_groups[0]['lr'] = learning_rate # Atualiza otimizador
-            agent.epsilon_decay = epsilon_decay # Força atualização
+                             gamma=gamma,
+                             learning_rate=learning_rate,
+                             epsilon_start=epsilon_start,
+                             min_epsilon=min_epsilon,
+                             epsilon_decay=epsilon_decay,
+                             target_update_freq=target_update_freq,
+                             memory_size=memory_size,
+                             world_model_path=world_model_path,
+                            world_model_n_categories=world_model_n_categories,
+                            world_model_hidden_size=world_model_hidden_size,
+                             debug=debug)
             
-            model_file_path = str(MODELS_DIR / f"{model_name}.pth")
+            
+            if output_dir is None or output_dir == '':
+                model_file_path = str(MODELS_DIR / f"{model_name}.pth")
+            else:
+                model_file_path = str(os.path.join(os.path.join(os.getcwd(), output_dir), f"{model_name}.pth"))
 
             # Log de Parâmetros
             mlflow.log_params({
@@ -245,6 +289,51 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
         finally:
             if env: env.close()
 
+
+
+
+
+def train_agent_from_config(args: TrainingArguments):
+    return train_agent(
+        # environment parameters
+        env_type=args.environment_config.get('env_type', 'maze'),
+        stack_size=args.environment_config.get('stack_size', 4),
+        latency_steps=args.environment_config.get('latency_steps', 5),
+        rotation_penalty=args.environment_config.get('rotation_penalty', 0.1),
+        threshold_blocked_front=args.environment_config.get('thresholds', {}).get('blocked_front', 0),
+        threshold_corner=args.environment_config.get('thresholds', {}).get('corner', 0),
+        threshold_proximity_danger=args.environment_config.get('thresholds', {}).get('proximity_danger', 0),
+        threshold_idle_movement=args.environment_config.get('thresholds', {}).get('idle_movement', 0),
+        rewards=args.environment_config.get('rewards', None),
+        
+        # agent parameters
+        use_dqn=args.agent_config.get('use_dqn', True),
+        learning_rate=args.agent_config.get('learning_rate', 0.0005),
+        gamma=args.agent_config.get('gamma', 0.9),
+        batch_size=args.agent_config.get('batch_size', 32),
+        epsilon_start=args.agent_config.get('epsilon_start', 1.0),
+        min_epsilon=args.agent_config.get('min_epsilon', 0.05),
+        epsilon_decay=args.agent_config.get('epsilon_decay', 0.99),
+        memory_size=args.agent_config.get('memory_size', 10000),
+        target_update_freq=args.agent_config.get('target_update_freq', 100),
+        
+        # world model parameters
+        world_model_path=args.world_model_config.get('model_path', 'mini_world_model'),
+        world_model_n_categories=args.world_model_config.get('n_categories', 32),
+        world_model_hidden_size=args.world_model_config.get('hidden_size', 64),
+        
+        #training parameters
+        episodes=args.training_config.get('episodes', 50),
+        max_steps=args.training_config.get('max_steps', 30),
+        display_every=args.training_config.get('display_every', 5),
+        headless=args.training_config.get('headless', False),
+        model_name=args.training_config.get('model_name', 'q_table_pc'),
+        experiment_name=args.training_config.get('experiment_name', 'ESP32_Robot_Navigation_2D'),
+        output_dir=args.training_config.get('output_dir', ''),
+    )
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, default="model_default", help="Nome do experimento/modelo")
@@ -252,25 +341,52 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--max_steps", type=int, default=200)
     parser.add_argument("--headless", action='store_true', help="Executar sem renderização")
+    parser.add_argument("--config", type=str, default=None, help="Caminho para arquivo de configuração (opcional)")
     args = parser.parse_args()
+    
+    config= None
+    model_name = args.name
+    
+    print(f"🧪 Iniciando Experimento: {model_name}")
+    model_save_name = f"{model_name}.pth" # O path completo será tratado na função save
+    
 
-    # Monta o caminho completo
-    model_save_name = f"{args.name}.pth" # O path completo será tratado na função save
 
-    print(f"🧪 Iniciando Experimento: {args.name}")
+    if args.config:
+        config = load_config(os.path.join('./configs/', args.config + '.yaml'))
+        model_name = config.get("model_name", model_name)
+        
+        train_args = TrainingArguments(
+            environment_config=config.get("environment", {}),
+            agent_config=config.get("agent", {}),
+            world_model_config=config.get("world_model", {}),
+            training_config=config.get("training", {})
+        )
+        
+        AGENTE_TREINADO, AMBIENTE, METRICAS = train_agent_from_config(train_args)
+        
+        
+        print("\n📊 Resultado Final:")
+        print(f"Média de Recompensa Final: {np.mean(METRICAS['reward_history'][-10:]):.1f}")
+        print("Modelo salvo em: q_table_pc.pth")
+        print("Gráfico salvo em: loss_chart.png")
+        print('Historico de recompensas: ')
+        print(METRICAS['reward_history'][:50])
+        
 
-    AGENTE_TREINADO, AMBIENTE, METRICAS = train_agent(
-        model_name=args.name, # Passa o nome limpo
-        episodes=args.episodes,
-        max_steps=args.max_steps,
-        batch_size=args.batch_size,
-        headless=args.headless,
-        display_every=1
-    )
+    else:
+        AGENTE_TREINADO, AMBIENTE, METRICAS = train_agent(
+            model_name=model_name, # Passa o nome limpo
+            episodes=args.episodes,
+            max_steps=args.max_steps,
+            batch_size=args.batch_size,
+            headless=args.headless,
+            display_every=1
+        )
 
-    print("\n📊 Resultado Final:")
-    print(f"Média de Recompensa Final: {np.mean(METRICAS['reward_history'][-10:]):.1f}")
-    print("Modelo salvo em: q_table_pc.pth")
-    print("Gráfico salvo em: loss_chart.png")
-    print('Historico de recompensas: ')
-    print(METRICAS['reward_history'][:50])
+        print("\n📊 Resultado Final:")
+        print(f"Média de Recompensa Final: {np.mean(METRICAS['reward_history'][-10:]):.1f}")
+        print("Modelo salvo em: q_table_pc.pth")
+        print("Gráfico salvo em: loss_chart.png")
+        print('Historico de recompensas: ')
+        print(METRICAS['reward_history'][:50])

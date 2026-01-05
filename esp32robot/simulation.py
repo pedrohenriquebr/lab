@@ -8,11 +8,12 @@ import random
 from pyparsing import deque
 
 ACTIONS_INDEX = {
-    'STOP': 0,
-    'FORWARD': 1,
-    'BACK': 2,
-    'LEFT': 3,
-    'RIGHT': 4
+    'action_stop': 0,
+    'action_fwd': 1,
+    'action_back': 2,
+    'action_left': 3,
+    'action_right': 4,
+    'action_turn': [3, 4]
 }
 
 
@@ -22,12 +23,47 @@ class Esp322DEnv(gym.Env):
     def __init__(self, render_mode=None, env_type='default', rotation_penalty=0.1, 
                  action_weights=None, 
                  latency_steps=0,
-                 stack_size=8):
+                 stack_size=8,
+                 num_sensors=3,
+                 threshold_blocked_front=0.25,
+                 threshold_corner=0.25,
+                 threshold_proximity_danger = 0.2,
+                 threshold_idle_movement = 0.05,
+                 rewards =None
+                 ):
         self.window_size = 600  # Tamanho da janela (pixels)
         self.map_scale = 100    # 100 pixels = 1 metro (Mundo de 6x6 metros)
         
         # Tipos: 'default', 'maze', 'circular_race_track', 'dynamic'
-        self.env_type = env_type 
+        self.env_type = env_type
+        self.threshold_blocked_front = threshold_blocked_front
+        self.threshold_corner = threshold_corner
+        self.threshold_proximity_danger = threshold_proximity_danger
+        self.threshold_idle_movement = threshold_idle_movement
+        
+        default_rewards = {
+            'collision': -1.0,
+            'penalities': {
+                'idle': -1.0,
+                'proximity_factor': -1.0,
+                'indecision': -0.8
+            },
+           'states': {
+                'in_corner': {'action_back': 0.5, 'default': -0.8},
+            'blocked_front': {
+                'action_back': 0.2,
+                'action_turn': 0.1,
+                'action_fwd': -1.0,
+                'default': -3.0
+            },
+            'clear_path': {
+                    'action_fwd': 1.0,
+                    'action_stop': -2.0,
+                'action_back': -5.0
+            }
+           }
+        }
+        self.rewards_config = rewards if rewards is not None else default_rewards
         
         self.render_mode = render_mode
         self.window = None
@@ -36,7 +72,7 @@ class Esp322DEnv(gym.Env):
         self.action_weights = action_weights if action_weights is not None else {0:0, 1:0, 2:0, 3:0, 4:0}
         self.last_action = 0
         self.stack_size = stack_size
-        self.num_sensors = 3
+        self.num_sensors = num_sensors
         total_obs = self.num_sensors * self.stack_size
         self.latency_steps = latency_steps
         self.action_buffer = deque([0] * (latency_steps+1), maxlen=latency_steps+1)
@@ -57,7 +93,7 @@ class Esp322DEnv(gym.Env):
         self.car_angle = 0.0
         
         self.obstacles = []
-        self.sensors = [0.0, 0.0, 0.0]
+        self.sensors = np.zeros(self.num_sensors).tolist()
 
     def _spawn_car_safely(self):
         """Tenta encontrar uma posição livre para nascer"""
@@ -209,48 +245,74 @@ class Esp322DEnv(gym.Env):
         if dist_moved < 0.01:
             self.steps_idle += 1
         self.last_pos = self.car_pos.copy()
+        
+    
 
         if collided:
             self.collision_count = 1
 
         # --- Recompensa (Lógica original preservada) ---
         d_left, d_center, d_right = self.sensors
-        is_blocked_front = d_center < 0.25 
-        is_in_corner = (d_left < 0.25) and (d_right < 0.25)
+        is_blocked_front = d_center < self.threshold_blocked_front
+        is_in_corner = (d_left < self.threshold_corner) and (d_right < self.threshold_corner)
 
         reward = 0
         terminated = False
-
+        
+        
         if collided:
-            reward = -1.0
+            reward = self.rewards_config.get('collision', -1.0)
             terminated = True
         else:
             if is_in_corner:
-                if delayed_action == 2: reward += 0.5 
-                else: reward -= 0.8 
+                corner_rewards = self.rewards_config.get('states',{}).get('in_corner', {})
+                if delayed_action == ACTIONS_INDEX['action_back']: 
+                    reward += corner_rewards.get('action_back', 0.5) 
+                else: 
+                    reward += corner_rewards.get('default', -0.8) 
             elif is_blocked_front:
-                if delayed_action == 2: reward += 0.2
-                elif delayed_action in [3, 4]: reward += 0.1 
-                elif delayed_action == 1: reward -= 1.0
-                else: reward -= 0.1
+                blocked_rewards = self.rewards_config.get('states',{}).get('blocked_front', {})
+                if delayed_action == ACTIONS_INDEX['action_back']: 
+                    reward += blocked_rewards.get('action_back', 0.2)
+                elif delayed_action in ACTIONS_INDEX['action_turn']: 
+                    reward += blocked_rewards.get('action_turn', 0.1)
+                elif delayed_action == ACTIONS_INDEX['action_fwd']: 
+                    reward += blocked_rewards.get('action_fwd', -1.0) 
+                else: 
+                    reward += blocked_rewards.get('default', -1.0) 
             else:
-                if delayed_action == 1: reward += 0.2
-                elif delayed_action == 0: reward -= 0.5
-                elif delayed_action == 2: reward -= 0.5
+                clear_path_rewards = self.rewards_config.get('states',{}).get('clear_path', {})
+                if delayed_action == ACTIONS_INDEX['action_fwd']: 
+                    reward += clear_path_rewards.get('action_fwd', 1.0)
+                elif delayed_action == ACTIONS_INDEX['action_stop']: 
+                    reward += clear_path_rewards.get('action_stop', -2.0)
+                elif delayed_action == ACTIONS_INDEX['action_back']: 
+                    reward += clear_path_rewards.get('action_back', -5.0)
+                elif delayed_action in ACTIONS_INDEX['action_turn']: 
+                    reward += clear_path_rewards.get('action_turn', -0.5)
+                else:
+                    reward += clear_path_rewards.get('default', -1.0)
             
-            if (self.last_action == 3 and delayed_action == 4) or (self.last_action == 4 and delayed_action == 3) or (delayed_action == 1 and self.last_action == 2) or (delayed_action == 2 and self.last_action == 1):
-                reward -= 0.4 # Punição severa por indecisão!
+            penalities = self.rewards_config.get('penalities', {})
+            # Penalidade por indecisão (Ações opostas consecutivas)
+            if (self.last_action == 3 and delayed_action == 4) or\
+                (self.last_action == 4 and delayed_action == 3) or \
+                (delayed_action == 1 and self.last_action == 2) or \
+                (delayed_action == 2 and self.last_action == 1):
+                reward += penalities.get('indecision', -0.8)
+            
+            
             self.last_action = action
             reward += self.action_weights.get(delayed_action, 0)
             
             # Penalidade se não sair do lugar (Anti-Trapaça)
-            if dist_moved < 0.01:
-                reward -= 0.2
+            if dist_moved < self.threshold_idle_movement:
+                reward -= penalities.get('idle', -1.0)
             
             # Penalidade de proximidade
             min_reading = min(self.sensors)
-            if min_reading < 0.3:
-                reward -= (0.3 - min_reading) * 1.0
+            if min_reading < self.threshold_proximity_danger:
+                reward -= (self.threshold_proximity_danger - min_reading) * penalities.get('proximity_factor', 1.0)
 
         if self.render_mode == "human":
             self.render()
@@ -262,6 +324,13 @@ class Esp322DEnv(gym.Env):
             "collision": collided,
             "dist_traveled": dist_from_start
         }
+        
+        
+        if self.steps_idle > 50:
+            terminated = True
+            reward -= 50.0 # Punição nuclear
+            info['collision'] = True # Trata como se fosse um acidente grave
+        
         
         return self._get_obs(), reward, terminated, False, info
 
@@ -404,3 +473,4 @@ class Esp322DEnv(gym.Env):
         if self.window is not None:
             pygame.display.quit()
             pygame.quit()
+            

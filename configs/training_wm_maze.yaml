@@ -1,0 +1,71 @@
+# --- Configurações do Simulador (Environment) ---
+environment:
+  env_type: "maze"          # default, maze, dynamic
+  stack_size: 4             # Quantos frames empilhar
+  latency_steps: 0          # Simulação de delay
+  rotation_penalty: 0.1     # Punição por girar demais
+  
+  # AJUSTE 1: Sensores mais tolerantes (menos "medo de fantasma")
+  thresholds:
+    blocked_front: 0.2657424678191094     # Baixei de 0.25 para ele chegar mais perto
+    corner: 0.20            # Baixei de 0.25
+    proximity_danger: 0.15  # Baixei de 0.2
+    idle_movement: 0.02
+
+  rewards:
+    # AJUSTE 2: Colisão catastrófica para balancear o ganho de andar
+    collision: -50.0        # Era -1.0. Bater agora é inaceitável.
+
+    penalties:
+      indecision: -0.5        # Aumentei punição por oscilar
+      idle: -5.0              # CRÍTICO: "O chão é lava". Parar dá muito prejuízo.
+      proximity_factor: 2.0   # Se chegar muito perto, a punição dobra.''
+    
+    states:
+      in_corner:              # Se preso no canto
+        action_back: 2.0      # Incentiva muito a sair da enrascada (era 0.5)
+        default: -2.0         # Ficar preso é ruim (era -0.8)
+      
+      blocked_front:          # Se bloqueado na frente
+        action_back: 0.5      # Ré é aceitável
+        action_turn: 2.0      # Curvar é a melhor opção (era 0.1)
+        action_fwd: -5.0      # Tentar furar a parede é proibido
+        default: -5.0         # Parar na frente da parede é proibido
+        
+      clear_path:             # Se caminho livre (Onde ele estava parando)
+        action_fwd: 3.0       # Recompensa sólida por andar
+        action_stop: -10.0     # Parar com caminho livre é CRIME (-5 pontos)
+        action_back: -5.0    # Dar ré com caminho livre é proibido
+        action_turn: -0.5
+        default: -1.0
+
+
+# --- Configurações do Cérebro (Agente DQN) ---
+agent:
+  use_dqn: true
+  learning_rate: 0.0001041662195048931
+  gamma: 0.9889641972411776               # Aumentei para 0.95 (visão longo prazo)
+  batch_size: 128
+  epsilon_start: 1.0
+  epsilon_min: 0.05
+  epsilon_decay: 0.9502572987809936      # Decay mais lento para garantir exploração das novas regras
+  memory_size: 10000        # Aumentei memória para lembrar de situações raras
+  target_update_freq: 100
+
+
+# --- Configurações do World Model (Olhos) ---
+world_model:
+  model_path: "mini_world_model.pth"
+  n_categorias: 32          # Mantive 32 conforme seu snippet
+  hidden_size: 64
+
+
+# --- Loop de Treinamento ---
+training:
+  experiment_name: "treino_maze_agressivo_v2"
+  output_dir: "models/"
+  model_name: "wm_model_agent"
+  episodes: 80             # Aumentei para garantir convergência
+  max_steps: 300            # Aumentei steps para dar tempo de percorrer o labirinto
+  headless: true
+  save_freq: 50
