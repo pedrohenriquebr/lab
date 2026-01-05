@@ -23,3 +23,11 @@ def load_config(config_path="config.yaml"):
     
     print(f"📄 Configuração carregada de: {config_path}")
     return config
+
+
+class ConfigurationParameters:
+    def __init__(self, environment_config: dict, agent_config: dict, world_model_config: dict, training_config: dict):
+        self.environment_config = environment_config
+        self.agent_config = agent_config
+        self.world_model_config = world_model_config
+        self.training_config = training_config
