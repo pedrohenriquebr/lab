@@ -1,6 +1,8 @@
 from esp32robot.agents import QAgent2D
 from esp32robot.config import MODELS_DIR
 from esp32robot.simulation import Esp322DEnv
+from esp32robot.mappers import map_config_params_to_dict
+
 import argparse
 import numpy as np
 import torch
@@ -9,24 +11,57 @@ import matplotlib.pyplot as plt
 import time
 import os
 
-def run_evaluation(model_name="q_table_pc", episodes=5, delay=0.05, latency_steps=0, stack_size=4, headless=True, show_results=False) -> tuple[float, dict[int, int], float]: 
+from esp32robot.utils import ConfigurationParameters, load_config
+
+def run_evaluation(model_name="q_table_pc", episodes=5, 
+                    delay=0.05, 
+                    latency_steps=0, 
+                    stack_size=4, 
+                    env_type='maze',
+                    threshold_blocked_front:float=0,
+                    threshold_corner:float=0,
+                    threshold_proximity_danger:float=0,
+                    threshold_idle_movement:float=0,
+                    rotation_penalty=0.1,
+                    rewards=None,
+                    output_dir: str  = '',                    
+                    debug: bool = False,
+                    world_model_path: str = 'mini_world_model',
+                    world_model_n_categories: int = 32,
+                    world_model_hidden_size: int = 64,
+                    headless=True, show_results=False) -> tuple[float, dict[int, int], float]: 
     """
     Carrega um modelo treinado e roda visualmente sem treinar.
     Agora inclui visualização do World Model (Sonho vs Realidade).
     """
-    mode = "human" if not headless else None
+    render_mode = "human" if not headless else None
     if not headless:
         print(f"\n🎬 INICIANDO MODO DE AVALIAÇÃO (VISUAL)")
 
     # 1. Cria o ambiente
-    env = Esp322DEnv(render_mode=mode, env_type='maze', latency_steps=latency_steps, stack_size=stack_size)
-    
+    env = Esp322DEnv(render_mode=render_mode, env_type=env_type, 
+                             rotation_penalty=rotation_penalty, 
+                             latency_steps=latency_steps, 
+                             stack_size=stack_size,
+                             threshold_blocked_front=threshold_blocked_front,
+                             threshold_corner=threshold_corner,
+                             threshold_proximity_danger=threshold_proximity_danger,
+                             threshold_idle_movement=threshold_idle_movement,
+                             rewards=rewards
+                             )
     # 2. Cria o agente (O init dele já carrega o World Model se existir o arquivo mini_world_model.pth)
     # Certifique-se de que o arquivo .pth do world model está na raiz ou onde o agente espera
-    agent = QAgent2D(env.action_space, env.observation_space, use_dqn=True, debug=not headless)
+    agent = QAgent2D(env.action_space, env.observation_space, use_dqn=True,  
+                            world_model_path=world_model_path,
+                            world_model_n_categories=world_model_n_categories,
+                            world_model_hidden_size=world_model_hidden_size,
+                            debug=debug)
     
-    # 3. Carrega o Modelo do Agente (DQN)
-    model_file_path = str(MODELS_DIR / f"{model_name}.pth")
+    if output_dir is None or output_dir == '':
+        model_file_path = str(MODELS_DIR / f"{model_name}.pth")
+    else:
+        model_file_path = str(os.path.join(os.path.join(os.getcwd(), output_dir), f"{model_name}.pth"))
+
     print(f"🔄 Carregando agente de: {model_file_path}")
 
     if os.path.exists(model_file_path):
@@ -173,15 +208,56 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, default="model_default", help="Nome do modelo (.pth)")
     parser.add_argument("--episodes", type=int, default=5)
-    parser.add_argument("--delay", type=float, default=0.01, help="Delay entre frames (s)")
+    parser.add_argument("--delay", type=float, required=True, default=0.01, help="Delay entre frames (s)")
     parser.add_argument("--headless", action="store_true", help="Rodar sem gráficos")
+    parser.add_argument("--config", type=str, default=None, help="Caminho para arquivo de configuração (opcional)")
     
     args = parser.parse_args()
+    
+    
+    
+    config= None
+    model_name = args.name
+    
+    print(f"🧪 Iniciando Experimento: {model_name}")
+    model_save_name = f"{model_name}.pth" # O path completo será tratado na função save
+    
 
-    # Exemplo de uso: python evaluate.py --name meu_agente --episodes 3
-    run_evaluation(
-        model_name=args.name, 
-        episodes=args.episodes, 
-        delay=args.delay, 
-        headless=args.headless
-    )
+
+    if args.config:
+        config = load_config(os.path.join('./configs/', args.config + '.yaml'))
+        model_name = config.get("model_name", model_name)
+        
+        eval_args = ConfigurationParameters(
+            environment_config=config.get("environment", {}),
+            agent_config=config.get("agent", {}),
+            world_model_config=config.get("world_model", {}),
+            training_config=config.get("training", {})
+        )
+        
+        params  = map_config_params_to_dict(eval_args)
+        eval_params = [ 'model_name','episodes','latency_steps','stack_size',
+                       'env_type','threshold_blocked_front','threshold_corner',
+                       'threshold_proximity_danger','threshold_idle_movement',
+                       'rotation_penalty','rewards','output_dir','debug',
+                       'world_model_path','world_model_n_categories',
+                       'world_model_hidden_size','headless']
+        
+        filtered_params = {k: v for k, v in params.items() if k in eval_params}
+        filtered_params['delay'] = args.delay
+        filtered_params['episodes'] = args.episodes
+        filtered_params['headless'] = args.headless
+        print(f"⚙️ Parâmetros de Avaliação carregados do arquivo de configuração:")
+        for k, v in filtered_params.items():
+            print(f"   - {k}: {v}")
+        
+        run_evaluation(**filtered_params)
+        
+    else:
+        # Exemplo de uso: python evaluate.py --name meu_agente --episodes 3
+        run_evaluation(
+            model_name=args.name, 
+            episodes=args.episodes, 
+            delay=args.delay, 
+            headless=args.headless
+        )

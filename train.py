@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from contextlib import nullcontext # <--- O SALVADOR DA PÁTRIA
 
 from esp32robot.config import COLAB_MODE, MODELS_DIR
+from esp32robot.mappers import map_config_params_to_dict
 from esp32robot.simulation import Esp322DEnv
 from esp32robot.agents import QAgent2D
 from IPython.display import clear_output
@@ -287,7 +288,7 @@ def train_agent(model_name='q_table_pc', episodes=50, max_steps=30, batch_size=3
 
 
 def train_agent_from_config(args: ConfigurationParameters):
-    return train_agent()
+    return train_agent(**map_config_params_to_dict(args))
 
 
 
