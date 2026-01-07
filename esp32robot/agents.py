@@ -79,6 +79,143 @@ class DiscreteWorldModel(nn.Module):
         probs = self.get_category_probs(x)
         return torch.argmax(probs, dim=1).item()
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+
+class VisualWorldModel(nn.Module):
+    def __init__(self, input_shape=(3, 64, 64), n_actions=5, n_categorias=32, hidden_size=128):
+        """
+        input_shape: Tupla (Canais, Altura, Largura). Ex: (3, 64, 64) ou (3, 96, 96)
+        """
+        super().__init__()
+        self.n_categorias = n_categorias
+        self.n_actions = n_actions
+        
+        c, h, w = input_shape # Desempacota (3, 64, 64)
+        
+        # --- 1. ENCODER (FLEXÍVEL) ---
+        self.encoder_cnn = nn.Sequential(
+            # Camada 1: Divide por 2
+            nn.Conv2d(c, 32, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            # Camada 2: Divide por 2
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            # Camada 3: Divide por 2
+            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            # Camada 4: Divide por 2
+            nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1),
+            nn.ReLU()
+        )
+        
+        # --- CÁLCULO AUTOMÁTICO DO TAMANHO ---
+        # Criamos um tensor falso com o tamanho da entrada para ver o que sai
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, c, h, w)
+            dummy_output = self.encoder_cnn(dummy_input)
+            
+            # Pega o formato de saída (Ex: [1, 256, 4, 4])
+            self.feature_shape = dummy_output.shape[1:] # Ignora o batch: (256, 4, 4)
+            self.flatten_size = dummy_output.view(1, -1).size(1) # Total de neurônios: 4096
+            
+            print(f"📐 Auto-Config: Input {h}x{w} -> CNN Sai {self.feature_shape[1]}x{self.feature_shape[2]} -> Linear {self.flatten_size}")
+
+        # Agora criamos o Linear com o tamanho exato calculado
+        self.encoder_head = nn.Linear(self.flatten_size, n_categorias)
+
+        # --- 2. DECODER (FLEXÍVEL) ---
+        # Faz o caminho reverso exato
+        self.decoder_head = nn.Linear(n_categorias, self.flatten_size)
+        
+        self.decoder_cnn = nn.Sequential(
+            # Unflatten manual no forward usando self.feature_shape
+            
+            # Deconv 1: x2
+            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            # Deconv 2: x2
+            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            # Deconv 3: x2
+            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            # Deconv 4: x2
+            nn.ConvTranspose2d(32, c, kernel_size=4, stride=2, padding=1),
+            nn.Sigmoid()
+        )
+
+        # --- 3. PREDICTOR (Igual) ---
+        self.predictor = nn.Sequential(
+            nn.Linear(n_categorias + n_actions, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, n_categorias)
+        )
+        
+        
+        self.inverse_head = nn.Sequential(
+            nn.Linear(n_categorias * 2, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Linear(hidden_size, n_actions)
+        )
+
+    def forward(self, x, action=None, hard=False, temperature=1.0):
+        batch_size = x.size(0)
+        
+        # --- Encoder ---
+        features = self.encoder_cnn(x)
+        # Usa reshape dinâmico
+        features = features.reshape(batch_size, -1) 
+        logits = self.encoder_head(features)
+        
+        z_dist = F.gumbel_softmax(logits, tau=temperature, hard=hard, dim=1)
+
+        # --- Decoder ---
+        z_dec = self.decoder_head(z_dist)
+        # Unflatten dinâmico usando o shape calculado no __init__
+        # self.feature_shape é (256, H_out, W_out)
+        z_dec = z_dec.reshape(batch_size, *self.feature_shape) 
+        reconstrucao = self.decoder_cnn(z_dec)
+
+        # --- Predictor ---
+        z_future_logits = None
+        if action is not None:
+            if isinstance(action, torch.Tensor) and action.dim() == 1:
+                action = action.long()
+                action_onehot = F.one_hot(action, num_classes=self.n_actions).float()
+            elif isinstance(action, torch.Tensor) and action.dim() == 2:
+                action_onehot = action.float()
+            else:
+                action_onehot = F.one_hot(torch.tensor(action), num_classes=self.n_actions).float().to(x.device)
+
+            pred_input = torch.cat([z_dist, action_onehot], dim=1)
+            z_future_logits = self.predictor(pred_input)
+
+        return reconstrucao, z_dist, z_future_logits, logits
+    
+    def get_latent_probs(self, x):
+        self.eval()
+        with torch.no_grad():
+            feat = self.encoder_cnn(x)
+            feat = feat.reshape(x.size(0), -1)
+            logits = self.encoder_head(feat)
+            return F.softmax(logits, dim=1)
+
+    def predict_action_inverse(self, z_current, z_next):
+        """
+        Tenta adivinhar qual ação levou de z_current para z_next.
+        """
+        # Concatena os dois vetores latentes
+        combined = torch.cat([z_current, z_next], dim=1)
+        action_logits = self.inverse_head(combined)
+        return action_logits
+
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
         super(DQN, self).__init__()

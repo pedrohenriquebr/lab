@@ -205,3 +205,11 @@ mlflow.db
 *.pkl
 *.joblib
 *.sqlite3
+
+!datasets/.gitkeep
+datasets/*
+
+*.mp4
+*.avi
+
+logs/*
