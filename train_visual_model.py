@@ -211,7 +211,7 @@ def train_one_epoch(model, dataloader, optimizer, device, cfg, current_epoch, te
             # Adicionamos a KL Loss manualmente com peso FIXO e PEQUENO
             # Isso atua como regularização de fundo, sem brigar com o Tuner
             BETA_KL = 0.01
-            total_loss = weighted_loss + (BETA_KL * kl_loss)
+            total_loss = weighted_loss + (BETA_KL * kl_loss) + (5.0 * loss_rec)
 
         scaler.scale(total_loss).backward()
         
@@ -361,8 +361,11 @@ def main():
         weight_decay=1e-4 # Um valor padrão saudável (0.0001)
     )
     
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.5, patience=LR_DECAY_EPOCHS
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, 
+        T_0=50,      # Ciclo de 50 épocas
+        T_mult=2,    # Dobra o ciclo (50 -> 100 -> 200)
+        eta_min=1e-5 # Nunca deixa o LR cair abaixo de 0.00001
     )
     
 
@@ -410,7 +413,7 @@ def main():
             
             
                 
-            scheduler.step(val_loss)
+            scheduler.step()
             
             is_best = val_loss < best_val_loss
             if is_best:
