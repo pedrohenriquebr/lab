@@ -355,9 +355,10 @@ def main():
     loss_tuner = DynamicLossTuner(n_losses=4).to(device)
     
     # Otimizador (Inclui parametros do modelo E do tuner)
-    optimizer = optim.Adam(
+    optimizer = optim.AdamW(
         list(model.parameters()) + list(loss_tuner.parameters()), 
-        lr=cfg['training']['learning_rate']
+        lr=cfg['training']['learning_rate'],
+        weight_decay=1e-4 # Um valor padrão saudável (0.0001)
     )
     
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
