@@ -98,6 +98,19 @@ def validate(model, val_loader, device, cfg, current_temp):
             
     return total_loss / max(1, steps)
 
+
+def save_data_split_info(train_videos, val_videos, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+    
+    with open(os.path.join(output_dir, "data_split.txt"), "w") as f:
+        f.write("Total Videos: {}\n".format(len(train_videos) + len(val_videos)))
+        f.write("Training Videos ({}):\n".format(len(train_videos)))
+        for vid in train_videos:
+            f.write(f"{vid}\n")
+        f.write("Validation Videos ({}):\n".format(len(val_videos)))
+        for vid in val_videos:
+            f.write(f"{vid}\n")
+
 # ==============================================================================
 # 2. LOOP DE TREINO
 # ==============================================================================
@@ -196,7 +209,6 @@ def train_one_epoch(model, dataloader, optimizer, device, cfg, current_epoch, te
 
             loss_pred = loss_pred_acc / horizon
             loss_inv = loss_inv_acc / horizon
-            
             # --- LOSS TUNER (SEM ENTROPIA) ---
             losses = {
                 'rec': loss_rec,
@@ -238,7 +250,7 @@ def train_one_epoch(model, dataloader, optimizer, device, cfg, current_epoch, te
             'Inv': f"{loss_inv.item():.3f}",
         })
         
-    return total_loss_rec/steps, total_loss_pred/steps, current_temp
+    return total_loss_rec/steps, total_loss_pred/steps, total_loss_inv / steps, current_temp
 
 # ==============================================================================
 # 3. MAIN
@@ -321,6 +333,9 @@ def main():
     train_count = len(all_videos) - val_count
     train_videos = all_videos[:train_count]
     val_videos = all_videos[train_count:]
+    
+    save_data_split_info(train_videos, val_videos, log_dir)
+    
     print(f"📂 Vídeos Treino: {len(train_videos)}, Validação: {len(val_videos)}")
     train_loader = create_dataloader(
         cfg['dataset']['train_path'],
@@ -361,11 +376,8 @@ def main():
         weight_decay=1e-4 # Um valor padrão saudável (0.0001)
     )
     
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-        optimizer, 
-        T_0=50,      # Ciclo de 50 épocas
-        T_mult=2,    # Dobra o ciclo (50 -> 100 -> 200)
-        eta_min=1e-5 # Nunca deixa o LR cair abaixo de 0.00001
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=LR_DECAY_EPOCHS
     )
     
 
@@ -402,7 +414,7 @@ def main():
 
             
             # CORREÇÃO: Passando loss_tuner
-            avg_rec, avg_pred, curr_temp = train_one_epoch(
+            avg_rec, avg_pred, avg_inv, curr_temp = train_one_epoch(
                 model, train_loader, optimizer, device, 
                 cfg, epoch, temp_scheduler, loss_tuner,
                 scaler=scaler
@@ -411,9 +423,9 @@ def main():
             val_loss = validate(model, val_loader, device, cfg, curr_temp)
             save_snapshot(model, val_loader, device, epoch, snap_dir, curr_temp)
             
-            
+            current_lr = scheduler.get_last_lr()[0]
                 
-            scheduler.step()
+            scheduler.step(val_loss)
             
             is_best = val_loss < best_val_loss
             if is_best:
@@ -424,11 +436,6 @@ def main():
             else:
                 epochs_no_improve += 1
                 status = f"⏳ ({epochs_no_improve}/{patience})"
-                
-                
-            if epoch % LR_DECAY_EPOCHS == 0 and epoch != 0 and not is_best:
-                current_lr = optimizer.param_groups[0]['lr']
-                print(f"Epoch {epoch}: Current learning rate is {current_lr}")
             
             checkpoint = {
                 'epoch': epoch,
@@ -440,7 +447,7 @@ def main():
             }
             torch.save(checkpoint, save_path_last)
             
-            print(f"✅ Ep {epoch} | Val: {val_loss:.4f} | Rec: {avg_rec:.3f} | Pred: {avg_pred:.3f} | {status}")
+            print(f"✅ Ep {epoch} | LR: {current_lr:.6f} | Val: {val_loss:.4f} | Rec: {avg_rec:.3f} | Pred: {avg_pred:.3f} | Inv: {avg_inv:.3f} | {status}")
             
             if epochs_no_improve >= patience:
                 print(f"\n🛑 EARLY STOPPING ACIONADO!")
