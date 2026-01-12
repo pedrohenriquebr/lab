@@ -9,20 +9,22 @@ dataset:
   # Mapeamento de ações MineRL -> Robô (0:Stop, 1:Fwd, 2:Back, 3:Left, 4:Right)
   # O código usará heurísticas (camera_x, forward, etc) para decidir
   action_mapping: true
-  max_videos: 5
+  max_videos: 200
   
 model:
   input_shape: [3, 64, 64]
   n_actions: 14        # Stop, Fwd, Back, Left, Right
-  n_categories: 64    # Tamanho do codebook latente
-  hidden_size: 128
+  n_categories: 512    # Tamanho do codebook latente
+  hidden_size: 1024
+  ch_channels: 64
   
 training:
   experiment_name: "minerl_pretrain_v1"
   output_dir: "models/"
   model_name: "visual_world_model_minerl"
+  patience: 300
   
-  epochs: 100
+  epochs: 5000
   batch_size: 64      # Ajuste conforme sua VRAM (32 ou 64 é seguro pra 64x64)
   learning_rate: 0.001
   save_every_step: 1000

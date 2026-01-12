@@ -103,8 +103,9 @@ def validate(model, val_loader, device, cfg, current_temp):
 # ==============================================================================
 
 # CORREÇÃO: Adicionado loss_tuner nos argumentos
-def train_one_epoch(model, dataloader, optimizer, device, cfg, current_epoch, temp_scheduler, loss_tuner):
+def train_one_epoch(model, dataloader, optimizer, device, cfg, current_epoch, temp_scheduler, loss_tuner, scaler):
     model.train()
+
     total_loss_rec = 0
     total_loss_pred = 0
     total_loss_inv = 0
@@ -124,92 +125,103 @@ def train_one_epoch(model, dataloader, optimizer, device, cfg, current_epoch, te
 
     pbar = tqdm(dataloader, total=total_batches, desc=f"Ep {current_epoch} (T={current_temp:.2f})", unit="batch")
 
+    use_amp = device.type == 'cuda'
+    
+    
     for batch_frames, batch_actions in pbar:
-        batch_frames = batch_frames.to(device)
-        batch_actions = batch_actions.to(device)
+        batch_frames = batch_frames.to(device,non_blocking=True)
+        batch_actions = batch_actions.to(device,non_blocking=True)
         
-        # --- PASSO 0: Estado Inicial ---
-        first_frame = batch_frames[:, 0]
-        recon, z_dist, _, encoder_logits = model(first_frame, hard=False, temperature=current_temp)
+        optimizer.zero_grad(set_to_none=True)
         
-        loss_rec = nn.MSELoss()(recon, first_frame)
-        
-        # --- CÁLCULO DE KL / ENTROPIA (CORRIGIDO: FREE BITS) ---
-        # Em vez de explodir o peso, usamos "Free Bits".
-        # Comparamos a distribuição do encoder com uma Uniforme (queremos que ele use todos os códigos)
-        # N_CAT = 64. Log(64) é a entropia máxima.
-        
-        # Logits -> LogSoftmax
-        log_q = F.log_softmax(encoder_logits, dim=1)
-        
-        # Prior Uniforme (queremos que ele use tudo)
-        # log(1/64) = -log(64)
-        log_p = torch.full_like(log_q, -np.log(model.n_categorias))
-        
-        # KL Divergence: D_KL(Q || P)
-        # Queremos minimizar a distância entre o que ele escolhe e a distribuição uniforme
-        kl_div = F.kl_div(log_q, log_p.exp(), reduction='batchmean')
-        
-        # Hinge Loss (Free Bits): Se a KL for pequena (< 1.0), não puna muito.
-        # Isso evita o colapso, mas sem a instabilidade do peso dinâmico.
-        free_bits = 3.0
-        kl_loss = kl_div
-        
-        loss_pred_acc = 0
-        loss_inv_acc = 0
-        current_z_dist = z_dist
-        
-        # --- LOOP MULTISTEP ---
-        horizon = batch_actions.shape[1] 
-        
-        for t in range(horizon):
-            action_at_t = batch_actions[:, t]
-            next_frame_real = batch_frames[:, t+1]
+        with torch.cuda.amp.autocast(enabled=use_amp):
+            # --- PASSO 0: Estado Inicial ---
+            first_frame = batch_frames[:, 0]
+            recon, z_dist, _, encoder_logits = model(first_frame, hard=False, temperature=current_temp)
             
-            # 1. Predição
-            z_next_logits = model.predict_next_from_dist(current_z_dist, action_at_t)
+            loss_rec = nn.MSELoss()(recon, first_frame)
             
-            # 2. Target (Detach para Stop Gradient)
-            with torch.no_grad():
-                target_probs = model.get_latent_probs(next_frame_real)
-                target_indices = torch.argmax(target_probs, dim=1)
+            # --- CÁLCULO DE KL / ENTROPIA (CORRIGIDO: FREE BITS) ---
+            # Em vez de explodir o peso, usamos "Free Bits".
+            # Comparamos a distribuição do encoder com uma Uniforme (queremos que ele use todos os códigos)
+            # N_CAT = 64. Log(64) é a entropia máxima.
             
-            step_loss_pred = nn.CrossEntropyLoss()(z_next_logits, target_indices)
-            loss_pred_acc += step_loss_pred
+            # Logits -> LogSoftmax
+            log_q = F.log_softmax(encoder_logits, dim=1)
             
-            # 3. Inversa
-            with torch.no_grad():
-                _, z_next_dist_real, _, _ = model(next_frame_real, hard=False, temperature=current_temp)
-            pred_action_logits = model.predict_action_inverse(current_z_dist, z_next_dist_real)
-            step_loss_inv = nn.CrossEntropyLoss()(pred_action_logits, action_at_t.long())
-            loss_inv_acc += step_loss_inv
+            # Prior Uniforme (queremos que ele use tudo)
+            # log(1/64) = -log(64)
+            log_p = torch.full_like(log_q, -np.log(model.n_categorias))
             
-            # 4. Próximo passo
-            current_z_dist = model.sample_from_logits(z_next_logits, temperature=current_temp, hard=False)
+            # KL Divergence: D_KL(Q || P)
+            # Queremos minimizar a distância entre o que ele escolhe e a distribuição uniforme
+            kl_div = F.kl_div(log_q, log_p.exp(), reduction='batchmean')
+            
+            # Hinge Loss (Free Bits): Se a KL for pequena (< 1.0), não puna muito.
+            # Isso evita o colapso, mas sem a instabilidade do peso dinâmico.
+            free_bits = 3.0
+            kl_loss = kl_div
+            
+            loss_pred_acc = 0
+            loss_inv_acc = 0
+            current_z_dist = z_dist
+            
+            # --- LOOP MULTISTEP ---
+            horizon = batch_actions.shape[1] 
+            
+            for t in range(horizon):
+                action_at_t = batch_actions[:, t]
+                next_frame_real = batch_frames[:, t+1]
+                
+                # 1. Predição
+                z_next_logits = model.predict_next_from_dist(current_z_dist, action_at_t)
+                
+                # 2. Target (Detach para Stop Gradient)
+                with torch.no_grad():
+                    target_probs = model.get_latent_probs(next_frame_real)
+                    target_indices = torch.argmax(target_probs, dim=1)
+                
+                step_loss_pred = nn.CrossEntropyLoss()(z_next_logits, target_indices)
+                loss_pred_acc += step_loss_pred
+                
+                # 3. Inversa
+                with torch.no_grad():
+                    _, z_next_dist_real, _, _ = model(next_frame_real, hard=False, temperature=current_temp)
+                pred_action_logits = model.predict_action_inverse(current_z_dist, z_next_dist_real)
+                step_loss_inv = nn.CrossEntropyLoss()(pred_action_logits, action_at_t.long())
+                loss_inv_acc += step_loss_inv
+                
+                # 4. Próximo passo
+                current_z_dist = model.sample_from_logits(z_next_logits, temperature=current_temp, hard=False)
 
-        loss_pred = loss_pred_acc / horizon
-        loss_inv = loss_inv_acc / horizon
-        
-        # --- LOSS TUNER (SEM ENTROPIA) ---
-        losses = {
-            'rec': loss_rec,
-            'pred': loss_pred,
-            'inv': loss_inv,
-            'ent': torch.tensor(0.0, device=device) # Dummy, o Tuner vai ignorar ou zerar
-        }
-        
-        # O Tuner decide os pesos das tarefas principais
-        weighted_loss, current_weights = loss_tuner(losses)
-        
-        # Adicionamos a KL Loss manualmente com peso FIXO e PEQUENO
-        # Isso atua como regularização de fundo, sem brigar com o Tuner
-        BETA_KL = 0.01
-        total_loss = weighted_loss + (BETA_KL * kl_loss)
+            loss_pred = loss_pred_acc / horizon
+            loss_inv = loss_inv_acc / horizon
+            
+            # --- LOSS TUNER (SEM ENTROPIA) ---
+            losses = {
+                'rec': loss_rec,
+                'pred': loss_pred,
+                'inv': loss_inv,
+                'ent': torch.tensor(0.0, device=device) # Dummy, o Tuner vai ignorar ou zerar
+            }
+            
+            # O Tuner decide os pesos das tarefas principais
+            weighted_loss, current_weights = loss_tuner(losses)
+            
+            # Adicionamos a KL Loss manualmente com peso FIXO e PEQUENO
+            # Isso atua como regularização de fundo, sem brigar com o Tuner
+            BETA_KL = 0.01
+            total_loss = weighted_loss + (BETA_KL * kl_loss)
 
-        optimizer.zero_grad()
-        total_loss.backward()
+        scaler.scale(total_loss).backward()
+        
+        # Unscale antes de clipar gradiente (opcional, mas bom pra estabilidade)
+        scaler.unscale_(optimizer)
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        optimizer.step()
+        
+        # Step otimizado
+        scaler.step(optimizer)
+        scaler.update()
         
         total_loss_rec += loss_rec.item()
         total_loss_pred += loss_pred.item()
@@ -232,10 +244,51 @@ def train_one_epoch(model, dataloader, optimizer, device, cfg, current_epoch, te
 # 3. MAIN
 # ==============================================================================
 
+def setup_colab_env(dataset_path):
+    """
+    Se estiver no Colab, move/descompacta os dados para o disco local da VM (/content).
+    Ler do Drive montado é MUITO LENTO para treinamento.
+    """
+    import shutil
+    
+    # Exemplo: Se o dataset_path for "datasets/carracing_human/train"
+    # E você tiver um zip no drive
+    print("☁️ Configurando ambiente Colab...")
+    
+    # Cria pasta local se não existir
+    local_path = f"/content/{dataset_path}"
+    if not os.path.exists(local_path):
+        print(f"📂 Criando diretório local: {local_path}")
+        os.makedirs(local_path, exist_ok=True)
+        
+        # AQUI VOCÊ PODE IMPLEMENTAR LÓGICA DE COPIA/UNZIP SE QUISER
+        # Ex: !cp /content/drive/MyDrive/robot/datasets.zip /content/
+        # Ex: !unzip /content/datasets.zip
+        
+        print("⚠️ IMPORTANTE: No Colab, certifique-se que seus dados estão em /content/")
+        print("   Ler direto de /content/drive/MyDrive é 10x mais lento.")
+    
+    return local_path
+
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default="minerl_pretrain")
+    parser.add_argument("--colab", action="store_true", help="Ativa otimizações para Google Colab")
+
     args = parser.parse_args()
+    
+    import sys
+    is_running_in_colab = 'google.colab' in sys.modules or args.colab
+    
+    use_amp = torch.cuda.is_available()
+    scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
+    
+    if is_running_in_colab:
+        print("🚀 MODO COLAB DETECTADO!")
+        
+    
     
     cfg = load_config(f"configs/{args.config}.yaml")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -254,6 +307,8 @@ def main():
     os.makedirs(model_dir, exist_ok=True)
     
     print(f"📁 Logs: {log_dir}")
+    
+    
 
     # Dataset
     max_videos = cfg['dataset'].get('max_videos', None)
@@ -264,12 +319,22 @@ def main():
     train_count = len(all_videos) - val_count
     train_videos = all_videos[:train_count]
     val_videos = all_videos[train_count:]
+    print(f"📂 Vídeos Treino: {len(train_videos)}, Validação: {len(val_videos)}")
+    train_loader = create_dataloader(
+        cfg['dataset']['train_path'],
+        train_videos, 
+        batch_size=cfg['training']['batch_size'], 
+        img_size=cfg['dataset'].get('img_size', 64),
+        is_colab=is_running_in_colab
+    )
     
-    train_ds = MineRLDataset(cfg['dataset']['train_path'], img_size=cfg['dataset']['img_size'], videos=train_videos)
-    val_ds = MineRLDataset(cfg['dataset']['train_path'], img_size=cfg['dataset']['img_size'], videos=val_videos)
-    
-    train_loader = torch.utils.data.DataLoader(train_ds, batch_size=cfg['training']['batch_size'])
-    val_loader = torch.utils.data.DataLoader(val_ds, batch_size=cfg['training']['batch_size'])
+    val_loader = create_dataloader(
+        cfg['dataset']['train_path'],
+        val_videos,
+        batch_size=cfg['training']['batch_size'], 
+        img_size=cfg['dataset'].get('img_size', 64),
+        is_colab=is_running_in_colab
+    )
 
     # Modelo
     model = VisualWorldModel(
@@ -279,6 +344,10 @@ def main():
         hidden_size=cfg['model']['hidden_size'],
         cnn_channels=cfg['model'].get('cnn_channels', 32)
     ).to(device)
+    
+    if is_running_in_colab and torch.__version__ >= "2.0.0":
+        print("🔥 Ativando torch.compile()... (Primeira época será lenta, depois voa)")
+        model = torch.compile(model)
     
     # Loss Tuner
     loss_tuner = DynamicLossTuner(n_losses=4).to(device)
@@ -318,7 +387,9 @@ def main():
             
             # CORREÇÃO: Passando loss_tuner
             avg_rec, avg_pred, curr_temp = train_one_epoch(
-                model, train_loader, optimizer, device, cfg, epoch, temp_scheduler, loss_tuner
+                model, train_loader, optimizer, device, 
+                cfg, epoch, temp_scheduler, loss_tuner,
+                scaler=scaler
             )
             
             val_loss = validate(model, val_loader, device, cfg, curr_temp)

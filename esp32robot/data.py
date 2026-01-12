@@ -9,7 +9,7 @@ from torchvision import transforms
 SEQ_LEN = 6 
         
 class MineRLDataset(IterableDataset):
-    def __init__(self, root_path, img_size=64, action_mapper=None, max_videos=None, videos=None,skip_frames=40):
+    def __init__(self, root_path, img_size=64, action_mapper=None, max_videos=None, videos=None,skip_frames=10):
         # self.transform = transforms.Compose([
         #     transforms.ToPILImage(),
         #     transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
@@ -211,9 +211,33 @@ class MineRLDataset(IterableDataset):
 
     def __iter__(self):
         return self._video_generator()
+    
 
-def create_dataloader(config_path, batch_size, img_size=64, max_videos=None):
-    """Factory method"""
-    dataset = MineRLDataset(config_path, max_videos=max_videos, img_size=img_size)
-    # num_workers=0 é mais seguro para debugging, pode aumentar se tiver CPU sobrando
-    return DataLoader(dataset, batch_size=batch_size, num_workers=2)
+def create_dataloader(config_path, videos, batch_size, img_size=64, max_videos=None, is_colab=False):
+    """Factory method inteligente"""
+    
+    # 1. Configurações otimizadas para Colab/Linux vs Windows
+    if is_colab or os.name == 'posix':
+        num_workers = 4        # Colab aguenta bem 2 ou 4 workers
+        prefetch_factor = 2    # Prepara batches na memória enquanto GPU treina
+        pin_memory = True      # Acelera transferência para GPU
+        persistent_workers = True # Mantém workers vivos (menos overhead)
+    else:
+        # Windows geralmente trava com workers > 0 em IterableDatasets simples
+        num_workers = 0        
+        prefetch_factor = None
+        pin_memory = False
+        persistent_workers = False
+
+    print(f"⚙️ DataLoader Config: Workers={num_workers}, Pin={pin_memory}, ColabMode={is_colab}")
+
+    dataset = MineRLDataset(config_path, videos=videos,max_videos=max_videos, img_size=img_size)
+    
+    return DataLoader(
+        dataset, 
+        batch_size=batch_size, 
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        prefetch_factor=prefetch_factor,
+        persistent_workers=persistent_workers
+    )
