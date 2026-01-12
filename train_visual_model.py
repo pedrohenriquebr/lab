@@ -296,6 +296,8 @@ def main():
     TEMP_START = 2.0
     TEMP_END = 0.1
     TEMP_DECAY_EPOCHS = 300
+    LR_DECAY_EPOCHS = 10
+    
     temp_scheduler = (TEMP_START, TEMP_END, TEMP_DECAY_EPOCHS)
 
     exp_name = cfg['training'].get('experiment_name', 'default_run')
@@ -357,6 +359,11 @@ def main():
         list(model.parameters()) + list(loss_tuner.parameters()), 
         lr=cfg['training']['learning_rate']
     )
+    
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode='min', factor=0.5, patience=LR_DECAY_EPOCHS
+    )
+    
 
     # Checkpoint
     save_path_best = os.path.join(model_dir, "best_visual_model.pth")
@@ -373,6 +380,9 @@ def main():
         # Tenta carregar estado do tuner se existir (se for checkpoint antigo, ignora)
         if 'loss_tuner_state_dict' in checkpoint:
             loss_tuner.load_state_dict(checkpoint['loss_tuner_state_dict'])
+        
+        if 'scheduler_state_dict' in checkpoint:
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             
         start_epoch = checkpoint['epoch']
         best_val_loss = checkpoint.get('best_val_loss', float('inf'))
@@ -385,6 +395,8 @@ def main():
         for epoch in range(start_epoch, cfg['training']['epochs']):
             start_time = time.time()
             
+
+            
             # CORREÇÃO: Passando loss_tuner
             avg_rec, avg_pred, curr_temp = train_one_epoch(
                 model, train_loader, optimizer, device, 
@@ -395,6 +407,10 @@ def main():
             val_loss = validate(model, val_loader, device, cfg, curr_temp)
             save_snapshot(model, val_loader, device, epoch, snap_dir, curr_temp)
             
+            
+                
+            scheduler.step(val_loss)
+            
             is_best = val_loss < best_val_loss
             if is_best:
                 best_val_loss = val_loss
@@ -404,13 +420,19 @@ def main():
             else:
                 epochs_no_improve += 1
                 status = f"⏳ ({epochs_no_improve}/{patience})"
+                
+                
+            if epoch % LR_DECAY_EPOCHS == 0 and epoch != 0 and not is_best:
+                current_lr = optimizer.param_groups[0]['lr']
+                print(f"Epoch {epoch}: Current learning rate is {current_lr}")
             
             checkpoint = {
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss_tuner_state_dict': loss_tuner.state_dict(), # Salva estado do tuner
-                'best_val_loss': best_val_loss
+                'best_val_loss': best_val_loss,
+                'scheduler_state_dict': scheduler.state_dict()
             }
             torch.save(checkpoint, save_path_last)
             
