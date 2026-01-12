@@ -1,0 +1,33 @@
+# ==========================================
+# CONFIGURAÇÃO DE TREINO (Lang-JEPA)
+# ==========================================
+
+dataset:
+  # Pode ser qualquer arquivo .txt (livros, código, conversas)
+  # O script vai criar um dummy se não existir
+  train_path: "datasets/text/corpus.txt"
+  seq_len: 64           # Tamanho do contexto (O que ele lê)
+  pred_len: 16          # Tamanho do futuro (O que ele tenta prever no latente)
+  batch_size: 64
+
+model:
+  vocab_size: 10000     # Tamanho do dicionário (Tokens)
+  embed_dim: 256        # Tamanho do vetor latente (O "Pensamento")
+  hidden_size: 512      # Tamanho do cérebro do Predictor
+  n_layers: 4           # Camadas do Transformer
+  n_heads: 4            # Cabeças de atenção
+  dropout: 0.1
+
+training:
+  experiment_name: "llm_jepa_v1"
+  output_dir: "models/"
+  model_name: "lang_jepa_model"
+  batch_size: 64
+  
+  epochs: 100
+  learning_rate: 0.0005
+  weight_decay: 0.01    # Importante para AdamW
+  
+  # O segredo do JEPA: Média Móvel Exponencial
+  ema_decay: 0.996      # Quão pouco a rede Target muda (estabilidade)
+  save_every_step: 500
