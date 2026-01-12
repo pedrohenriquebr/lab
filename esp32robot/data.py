@@ -6,14 +6,17 @@ import numpy as np
 from torch.utils.data import IterableDataset, DataLoader
 from torchvision import transforms
 
+SEQ_LEN = 6 
+        
 class MineRLDataset(IterableDataset):
-    def __init__(self, root_path, img_size=64, action_mapper=None, max_videos=None, videos=None):
-        self.transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05), # Muda luz
-            transforms.ToTensor(),
-            transforms.RandomErasing(p=0.5, scale=(0.02, 0.20), ratio=(0.3, 3.3), value=0),
-        ])
+    def __init__(self, root_path, img_size=64, action_mapper=None, max_videos=None, videos=None,skip_frames=40):
+        # self.transform = transforms.Compose([
+        #     transforms.ToPILImage(),
+        #     transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
+        #     transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1, hue=0.05), # Muda luz
+        #     transforms.ToTensor(),
+        # ])
+        self.skip_frames = skip_frames
         self.root_path = root_path
         self.img_size = img_size
         all_videos = [f for f in os.listdir(root_path) if f.endswith('.mp4')] if videos is None else videos
@@ -41,16 +44,21 @@ class MineRLDataset(IterableDataset):
             cap = cv2.VideoCapture(vid_path)
             if not cap.isOpened(): continue
             
-            n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            raw_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             
             # Ajusta baseado no limite do metadata se existir
             meta_entry = self.metadata.get(vid_name, None)
             if meta_entry and 'forward' in meta_entry:
-                n_frames = min(n_frames, len(meta_entry['forward']))
+                raw_frames = min(raw_frames, len(meta_entry['forward']))
+                
+            
+            step_size  = self.skip_frames + 1
+            effective_frames = (raw_frames + step_size - 1) // step_size
             
             # Cada frame gera 1 amostra (exceto o último que não tem 'next')
-            if n_frames > 1:
-                self.total_samples += (n_frames - 1)
+            if effective_frames > SEQ_LEN:
+                self.total_samples += (effective_frames - SEQ_LEN)
+                
             cap.release()
             
         print(f"✅ Total de frames para treino: {self.total_samples}")
@@ -65,6 +73,9 @@ class MineRLDataset(IterableDataset):
             Prioridade: Ações Raras > Movimento Combinado > Movimento Simples
             """
             if meta_entry is None: return 0
+            
+            if 'action_discrete' in meta_entry:
+                return meta_entry['action_discrete'][frame_idx]
 
             # 1. Extração de Dados Brutos (com tratamento de erro)
             # Mouse (Camera)
@@ -144,48 +155,65 @@ class MineRLDataset(IterableDataset):
             return tensor.permute(2, 0, 1)
 
     def _video_generator(self):
-        """Generator que itera vídeo por vídeo, frame por frame"""
+        """
+        Generator modificado para Multistep Prediction COM FRAME SKIPPING.
+        """
+
+        
         for vid_name in self.videos:
             vid_path = os.path.join(self.root_path, vid_name)
             cap = cv2.VideoCapture(vid_path)
             
             meta_entry = self.metadata.get(vid_name, {})
-            # Fallback seguro para metadados
-            fwd_list = meta_entry.get('forward', [])
-            
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             
-            if fwd_list:
-                loop_limit = min(total_frames, len(fwd_list)) - 1
-            else:
-                loop_limit = total_frames - 1
+            frame_buffer = []
+            action_buffer = []
+            
+            frame_idx = 0
+            while True:
+                # --- FRAME SKIPPING (NOVO) ---
+                # Lê e descarta frames para acelerar o tempo
+                for _ in range(self.skip_frames):
+                    success_skip, _ = cap.read()
+                    if not success_skip:
+                        break # Vídeo acabou durante o pulo
+                    frame_idx += 1 # Importante: manter o índice de ação sincronizado!
+                # -----------------------------
 
-            ret, prev_frame = cap.read()
-            if not ret: continue
-            
-            prev_tensor = self._process_frame(prev_frame)
-            
-            for i in range(loop_limit):
-                ret, curr_frame = cap.read()
-                if not ret: break
+                ret, frame = cap.read()
+                if not ret: break # Vídeo acabou
                 
-                curr_tensor = self._process_frame(curr_frame)
+                # Processa frame
+                tensor = self._process_frame(frame)
+                frame_buffer.append(tensor)
                 
-                # Pega ação do frame anterior
-                action_id = self._default_mapper(meta_entry, i)
+                # Pega ação deste frame (agora sincronizado com o pulo)
+                if frame_idx < total_frames - 1: 
+                    action_id = self.action_mapper(meta_entry, frame_idx)
+                    action_buffer.append(action_id)
                 
-                # Yield: (Estado Atual, Ação Tomada, Próximo Estado)
-                yield prev_tensor, action_id, curr_tensor
+                # Se encheu o buffer, solta a sequência
+                if len(frame_buffer) == SEQ_LEN:
+                    seq_frames = torch.stack(frame_buffer) 
+                    
+                    # Correção de segurança: as vezes o buffer de ação fica menor se o vídeo acabar
+                    if len(action_buffer) >= SEQ_LEN - 1:
+                        seq_actions = torch.tensor(action_buffer[:SEQ_LEN-1])
+                        yield seq_frames, seq_actions
+                    
+                    frame_buffer.pop(0)
+                    action_buffer.pop(0)
                 
-                prev_tensor = curr_tensor
+                frame_idx += 1
                 
             cap.release()
 
     def __iter__(self):
         return self._video_generator()
 
-def create_dataloader(config_path, batch_size, max_videos=None):
+def create_dataloader(config_path, batch_size, img_size=64, max_videos=None):
     """Factory method"""
-    dataset = MineRLDataset(config_path, max_videos=max_videos)
+    dataset = MineRLDataset(config_path, max_videos=max_videos, img_size=img_size)
     # num_workers=0 é mais seguro para debugging, pode aumentar se tiver CPU sobrando
-    return DataLoader(dataset, batch_size=batch_size, num_workers=0)
+    return DataLoader(dataset, batch_size=batch_size, num_workers=2)

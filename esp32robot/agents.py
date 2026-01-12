@@ -85,7 +85,7 @@ import torch.nn.functional as F
 import numpy as np
 
 class VisualWorldModel(nn.Module):
-    def __init__(self, input_shape=(3, 64, 64), n_actions=5, n_categorias=32, hidden_size=128):
+    def __init__(self, input_shape=(3, 64, 64), n_actions=5, n_categorias=32, hidden_size=128,cnn_channels=32):
         """
         input_shape: Tupla (Canais, Altura, Largura). Ex: (3, 64, 64) ou (3, 96, 96)
         """
@@ -94,74 +94,82 @@ class VisualWorldModel(nn.Module):
         self.n_actions = n_actions
         
         c, h, w = input_shape # Desempacota (3, 64, 64)
-        
+        ch = cnn_channels
         # --- 1. ENCODER (FLEXÍVEL) ---
         self.encoder_cnn = nn.Sequential(
-            # Camada 1: Divide por 2
-            nn.Conv2d(c, 32, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            # Camada 2: Divide por 2
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            # Camada 3: Divide por 2
-            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            # Camada 4: Divide por 2
-            nn.Conv2d(128, 256, kernel_size=4, stride=2, padding=1),
-            nn.ReLU()
+            nn.Conv2d(c, ch, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(ch),      # <--- NOVO
+            nn.LeakyReLU(0.1),       # <--- NOVO (Substitui ReLU)
+            
+            nn.Conv2d(ch, ch*2, 4, 2, 1),
+            nn.BatchNorm2d(ch*2),      # <--- NOVO
+            nn.LeakyReLU(0.1),
+            
+            nn.Conv2d(ch*2, ch*4, 4, 2, 1),
+            nn.BatchNorm2d(ch*4),     # <--- NOVO
+            nn.LeakyReLU(0.1),
+            
+            nn.Conv2d(ch*4, ch*8, 4, 2, 1),
+            nn.BatchNorm2d(ch*8),     # <--- NOVO
+            nn.LeakyReLU(0.1)
         )
         
         # --- CÁLCULO AUTOMÁTICO DO TAMANHO ---
-        # Criamos um tensor falso com o tamanho da entrada para ver o que sai
         with torch.no_grad():
             dummy_input = torch.zeros(1, c, h, w)
             dummy_output = self.encoder_cnn(dummy_input)
-            
-            # Pega o formato de saída (Ex: [1, 256, 4, 4])
-            self.feature_shape = dummy_output.shape[1:] # Ignora o batch: (256, 4, 4)
-            self.flatten_size = dummy_output.view(1, -1).size(1) # Total de neurônios: 4096
+            self.feature_shape = dummy_output.shape[1:] 
+            self.flatten_size = dummy_output.view(1, -1).size(1)
             
             print(f"📐 Auto-Config: Input {h}x{w} -> CNN Sai {self.feature_shape[1]}x{self.feature_shape[2]} -> Linear {self.flatten_size}")
 
-        # Agora criamos o Linear com o tamanho exato calculado
-        self.encoder_head = nn.Linear(self.flatten_size, n_categorias)
-
-        # --- 2. DECODER (FLEXÍVEL) ---
-        # Faz o caminho reverso exato
-        self.decoder_head = nn.Linear(n_categorias, self.flatten_size)
-        
-        self.decoder_cnn = nn.Sequential(
-            # Unflatten manual no forward usando self.feature_shape
-            
-            # Deconv 1: x2
-            nn.ConvTranspose2d(256, 128, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            # Deconv 2: x2
-            nn.ConvTranspose2d(128, 64, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            # Deconv 3: x2
-            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1),
-            nn.ReLU(),
-            # Deconv 4: x2
-            nn.ConvTranspose2d(32, c, kernel_size=4, stride=2, padding=1),
-            nn.Sigmoid()
+        self.encoder_head = nn.Sequential(
+            nn.Linear(self.flatten_size, hidden_size), # 9216 -> 512
+            nn.BatchNorm1d(hidden_size),               # Estabiliza
+            nn.LeakyReLU(0.1),
+            nn.Linear(hidden_size, n_categorias)       # 512 -> 64
         )
 
-        # --- 3. PREDICTOR (Igual) ---
+        self.decoder_head = nn.Sequential(
+            nn.Linear(n_categorias, hidden_size),      # 64 -> 512
+            nn.BatchNorm1d(hidden_size),
+            nn.LeakyReLU(0.1),
+            nn.Linear(hidden_size, self.flatten_size)  # 512 -> 9216
+        )
+        
+        self.decoder_cnn = nn.Sequential(
+            nn.ConvTranspose2d(ch*8, ch*4, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(ch*4),     # <--- CRÍTICO: Normaliza antes de ativar
+            nn.LeakyReLU(0.1),
+
+            nn.ConvTranspose2d(ch*4, ch*2, 4, 2, 1),
+            nn.BatchNorm2d(ch*2),
+            nn.LeakyReLU(0.1),
+            
+            nn.ConvTranspose2d(ch*2, ch, 4, 2, 1),
+            nn.BatchNorm2d(ch),
+            nn.LeakyReLU(0.1),
+            
+            # Última camada não tem BatchNorm nem Leaky, pois sai direto pra imagem
+            nn.ConvTranspose2d(ch, c, 4, 2, 1),
+            nn.Sigmoid() 
+        )
+
+        # --- 3. PREDICTOR (Concatena Z + Ação OneHot) ---
         self.predictor = nn.Sequential(
             nn.Linear(n_categorias + n_actions, hidden_size),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),       # LeakyReLU aqui também ajuda
             nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.Linear(hidden_size, n_categorias)
         )
         
-        
+        # --- 4. INVERSE DYNAMICS ---
         self.inverse_head = nn.Sequential(
-            nn.Linear(n_categorias * 2, hidden_size),
-            nn.ReLU(),
+             nn.Linear(n_categorias * 2, hidden_size),
+            nn.LeakyReLU(0.1),
             nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.Linear(hidden_size, n_actions)
         )
 
@@ -170,7 +178,6 @@ class VisualWorldModel(nn.Module):
         
         # --- Encoder ---
         features = self.encoder_cnn(x)
-        # Usa reshape dinâmico
         features = features.reshape(batch_size, -1) 
         logits = self.encoder_head(features)
         
@@ -178,24 +185,14 @@ class VisualWorldModel(nn.Module):
 
         # --- Decoder ---
         z_dec = self.decoder_head(z_dist)
-        # Unflatten dinâmico usando o shape calculado no __init__
-        # self.feature_shape é (256, H_out, W_out)
         z_dec = z_dec.reshape(batch_size, *self.feature_shape) 
         reconstrucao = self.decoder_cnn(z_dec)
 
         # --- Predictor ---
         z_future_logits = None
         if action is not None:
-            if isinstance(action, torch.Tensor) and action.dim() == 1:
-                action = action.long()
-                action_onehot = F.one_hot(action, num_classes=self.n_actions).float()
-            elif isinstance(action, torch.Tensor) and action.dim() == 2:
-                action_onehot = action.float()
-            else:
-                action_onehot = F.one_hot(torch.tensor(action), num_classes=self.n_actions).float().to(x.device)
-
-            pred_input = torch.cat([z_dist, action_onehot], dim=1)
-            z_future_logits = self.predictor(pred_input)
+            # Reutiliza a lógica de predição para evitar código duplicado
+            z_future_logits = self.predict_next_from_dist(z_dist, action)
 
         return reconstrucao, z_dist, z_future_logits, logits
     
@@ -206,15 +203,45 @@ class VisualWorldModel(nn.Module):
             feat = feat.reshape(x.size(0), -1)
             logits = self.encoder_head(feat)
             return F.softmax(logits, dim=1)
+            
+    def sample_from_logits(self, logits, temperature=1.0, hard=False):
+        """Helper para o loop de treino gerar o z_dist a partir de logits previstos"""
+        return F.gumbel_softmax(logits, tau=temperature, hard=hard, dim=1)
 
     def predict_action_inverse(self, z_current, z_next):
         """
         Tenta adivinhar qual ação levou de z_current para z_next.
         """
-        # Concatena os dois vetores latentes
         combined = torch.cat([z_current, z_next], dim=1)
         action_logits = self.inverse_head(combined)
         return action_logits
+
+    def predict_next_from_dist(self, z_dist, action):
+        """
+        Prevê o próximo Z dado um Z atual (distribuição) e uma ação.
+        Pula o Encoder.
+        CORRIGIDO: Usa One-Hot Encoding igual ao forward original.
+        """
+        # Garante que a ação seja Tensor Long
+        if not isinstance(action, torch.Tensor):
+            action = torch.tensor(action, device=z_dist.device)
+        
+        # Se vier [Batch, 1], remove a dimensão extra
+        if action.dim() > 1 and action.shape[1] == 1:
+            action = action.squeeze(1)
+            
+        action = action.long()
+        
+        # Cria One-Hot
+        action_onehot = F.one_hot(action, num_classes=self.n_actions).float()
+        
+        # Concatena (Z + Ação)
+        # O predictor espera: [Batch, n_categorias + n_actions]
+        pred_input = torch.cat([z_dist, action_onehot], dim=1)
+        
+        # Passa pelo MLP
+        z_future_logits = self.predictor(pred_input)
+        return z_future_logits
 
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim):
