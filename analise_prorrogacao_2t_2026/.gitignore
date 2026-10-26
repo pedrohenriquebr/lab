@@ -1,0 +1,5 @@
+raw/
+__pycache__/
+data/sections_t*.csv
+# saídas de execuções PARCIAIS (crawl interrompido) não são versionadas
+data/*.csv
